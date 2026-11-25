@@ -1,5 +1,5 @@
-# Sakura 0.4.1
+# Sakura & Launcher estelar
 
-Launcher Android rosa com desktop fixo, atalhos selecionados pelo usuário, ícones com legenda sem fundo, gaveta vertical com índice alfabético e animações de 90 ms. A janela de mídia é independente e pode ser arrastada pelo título, com posição persistida. A migração 0.4.1 limpa os atalhos da home uma vez para iniciar somente com Aplicativos e Terminal; novos atalhos são adicionados pelo alfinete na gaveta. Widgets nativos sem acesso a notificações.
+Dois APKs independentes. Sakura 0.4.3 mantém o tema rosa e Termux. Launcher 1.0.0 tem tema navy/ciano, céu estático opcional, desktop clássico, gaveta alfabética, animações de 90 ms e widgets nativos. Não contém integração Termux nem acesso às notificações. Ambos usam a API LauncherApps e alternativas para iniciar os apps instalados.
 
-APK em [Actions](https://github.com/elenaess/rose/actions).
+[Baixar em Actions](https://github.com/elenaess/rose/actions).

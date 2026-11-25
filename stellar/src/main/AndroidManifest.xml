@@ -1,0 +1,24 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries>
+        <intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent>
+        <intent><action android:name="org.adw.launcher.THEMES"/></intent>
+        <intent><action android:name="com.novalauncher.THEME"/></intent>
+        <intent><action android:name="com.anddoes.launcher.THEME"/></intent>
+        <intent><action android:name="com.teslacoilsw.launcher.THEME"/></intent>
+    </queries>
+    <application android:label="Launcher" android:icon="@mipmap/sakura_icon" android:roundIcon="@mipmap/sakura_icon" android:theme="@style/RoseTheme" android:allowBackup="false" android:supportsRtl="true">
+        <activity android:name="br.dev.rose.launcher.HomeActivity" android:exported="true" android:launchMode="singleTask"
+            android:enableOnBackInvokedCallback="false" android:windowSoftInputMode="adjustResize"
+            android:stateNotNeeded="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.HOME"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
