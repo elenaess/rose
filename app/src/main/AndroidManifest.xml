@@ -3,6 +3,14 @@
     <queries>
         <intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent>
         <package android:name="com.termux"/>
+        <package android:name="com.panotogomo.pink"/>
+        <package android:name="com.italiano.pinkflamingo"/>
+        <package android:name="com.jndapp.lux.pink.iconpack"/>
+        <package android:name="com.ronald.pink.iconpack"/>
+        <intent><action android:name="org.adw.launcher.THEMES"/></intent>
+        <intent><action android:name="com.novalauncher.THEME"/></intent>
+        <intent><action android:name="com.anddoes.launcher.THEME"/></intent>
+        <intent><action android:name="com.teslacoilsw.launcher.THEME"/></intent>
     </queries>
     <application android:label="Sakura" android:icon="@mipmap/sakura_icon" android:roundIcon="@mipmap/sakura_icon" android:theme="@style/RoseTheme" android:allowBackup="false" android:supportsRtl="true">
         <activity android:name=".HomeActivity" android:exported="true" android:launchMode="singleTask"

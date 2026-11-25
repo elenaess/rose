@@ -40,6 +40,8 @@ public final class HomeActivity extends Activity {
     private static final long MOTION=90L;
     private SharedPreferences prefs;
     private final Catalog catalog = new Catalog();
+    private volatile IconPack iconPack=IconPack.empty();
+    private final android.graphics.ColorMatrixColorFilter pinkFilter=new android.graphics.ColorMatrixColorFilter(new float[]{.155f,.520f,.053f,0,69,.133f,.447f,.046f,0,34,.136f,.455f,.046f,0,61,0,0,0,1,0});
     private final ArrayList<Catalog.Entry> apps = new ArrayList<>();
     private final ArrayList<String> pins = new ArrayList<>();
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
@@ -119,11 +121,12 @@ public final class HomeActivity extends Activity {
     private void loadApps() {
         int sequence=++revision;
         worker.execute(() -> {
+            IconPack pack=IconPack.load(this,prefs.getString("icon_pack","auto"));
             ArrayList<Catalog.Entry> list=catalog.load(this);
-            for(Catalog.Entry e:list){if(Thread.currentThread().isInterrupted())return;catalog.icon(this,e);}
+            for(Catalog.Entry e:list){if(Thread.currentThread().isInterrupted())return;if(pack.icon(e.key)==null)catalog.icon(this,e);}
             main.post(() -> {
                 if (isDestroyed() || sequence != revision) return;
-                apps.clear();apps.addAll(list);loaded=true;
+                iconPack=pack;apps.clear();apps.addAll(list);loaded=true;
                 if (!prefs.contains("pins")) savePins();
                 drawRail();
                 if ("apps".equals(page)) refreshApps();
@@ -169,7 +172,7 @@ public final class HomeActivity extends Activity {
             TextClock date=new TextClock(this);date.setFormat12Hour("EEE, dd/MM");date.setFormat24Hour("EEE, dd/MM");
             date.setTextColor(WINE);date.setTextSize(12);infoBody.addView(date);
         }
-        infoBody.addView(u.text("SAKURA  /  0.4.1",11,WINE,"monospace"));
+        infoBody.addView(u.text("SAKURA  /  0.4.2",11,WINE,"monospace"));
         homeChoice=u.pill("Fixar como launcher",accent,WINE,this::chooseHome);infoBody.addView(homeChoice,u.lp(FULL,32));updateHomeChoice();
         info.addView(infoBody);
         u.place(desktop,info,widgetWidth,WRAP,Gravity.TOP|Gravity.END,0,12,8,0);
@@ -200,12 +203,25 @@ public final class HomeActivity extends Activity {
         u.action(item,0,0,action);item.setContentDescription(label);return item;
     }
     private android.graphics.drawable.Drawable styledIcon(Catalog.Entry item){
+        android.graphics.drawable.Drawable supplied=iconPack.icon(item.key);
+        if(supplied!=null)return supplied;
         android.graphics.drawable.Drawable d=catalog.icon(this,item).mutate();
-        if(prefs.getBoolean("pink_icons",true)){
-            // Remap luminance to a rose palette, preserving recognizable icon details.
-            android.graphics.ColorMatrix m=new android.graphics.ColorMatrix(new float[]{.155f,.520f,.053f,0,69,.133f,.447f,.046f,0,34,.136f,.455f,.046f,0,61,0,0,0,1,0});
-            d.setColorFilter(new android.graphics.ColorMatrixColorFilter(m));
-        }else d.clearColorFilter();return d;
+        if(prefs.getBoolean("pink_icons",true))d.setColorFilter(pinkFilter);else d.clearColorFilter();
+        return d;
+    }
+    private void chooseIconPack(){
+        final ArrayList<IconPack.Option> packs=IconPack.installed(this);
+        String[] labels=new String[packs.size()+2];
+        labels[0]="Automático (pacote rosa instalado)";labels[1]="Sem pacote externo";
+        for(int i=0;i<packs.size();i++)labels[i+2]=packs.get(i).label;
+        String current=prefs.getString("icon_pack","auto");
+        int selected=current.equals("auto")?0:current.isEmpty()?1:-1;
+        for(int i=0;i<packs.size();i++)if(current.equals(packs.get(i).pkg))selected=i+2;
+        new AlertDialog.Builder(this).setTitle("Pacote de ícones").setSingleChoiceItems(labels,selected,(dialog,index)->{
+            String pkg=index==0?"auto":index==1?"":packs.get(index-2).pkg;
+            prefs.edit().putString("icon_pack",pkg).apply();dialog.dismiss();
+            iconPack=IconPack.empty();loadApps();openSettings();
+        }).setNeutralButton("Ver pacotes rosa",(d,w)->external(new Intent(Intent.ACTION_VIEW,Uri.parse("https://play.google.com/store/apps/details?id=com.panotogomo.pink")))).setNegativeButton("Cancelar",null).show();
     }
     private void updateHomeChoice(){if(homeChoice!=null)homeChoice.setVisibility(getSystemService(RoleManager.class).isRoleHeld(RoleManager.ROLE_HOME)?View.GONE:View.VISIBLE);}
     private void drawRail() {
@@ -459,7 +475,8 @@ public final class HomeActivity extends Activity {
         }));
         boolean isDefault=getSystemService(RoleManager.class).isRoleHeld(RoleManager.ROLE_HOME);
         body.addView(u.commandRow(R.drawable.ic_house,"Tela inicial padrão",isDefault?"Sakura está ativo":"Escolher o Sakura",this::chooseHome));
-        body.addView(u.commandRow(R.drawable.ic_palette,"Ícones rosa",prefs.getBoolean("pink_icons",true)?"Ativos · tocar para usar os originais":"Originais · tocar para usar rosa",()->{prefs.edit().putBoolean("pink_icons",!prefs.getBoolean("pink_icons",true)).apply();showHome();openSettings();}));
+        body.addView(u.commandRow(R.drawable.ic_palette,"Pacote de ícones",iconPack.label.isEmpty()?"Selecionar pacote instalado":iconPack.label,this::chooseIconPack));
+        body.addView(u.commandRow(R.drawable.ic_palette,"Rosa para ícones ausentes",prefs.getBoolean("pink_icons",true)?"Ativo quando não houver ícone no pacote":"Usar ícone original quando faltar",()->{prefs.edit().putBoolean("pink_icons",!prefs.getBoolean("pink_icons",true)).apply();showHome();openSettings();}));
         body.addView(u.commandRow(R.drawable.ic_heart,"Quadro de mídia",prefs.getBoolean("media",true)?"Visível · tocar para ocultar":"Oculto · tocar para mostrar",()->{prefs.edit().putBoolean("media",!prefs.getBoolean("media",true)).apply();showHome();openSettings();}));
         body.addView(u.commandRow(R.drawable.ic_layout_grid,"Reposicionar janela de mídia","Restaurar posição inicial",()->{prefs.edit().remove("media_x").remove("media_y").apply();showHome();}));
         body.addView(u.commandRow(R.drawable.ic_settings_2,"Escolher widget de mídia","Usar o widget fornecido pelo seu player",()->{closeSheet();if(media!=null)media.choose();else toast("Ative o quadro de mídia primeiro.");}));
