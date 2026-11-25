@@ -29,6 +29,8 @@ public final class HomeActivity extends Activity {
     private FrameLayout base, safe, desktop, overlay;
     private View navFill, homeChoice;
     private NowPlaying media;
+    private android.appwidget.AppWidgetHost widgetHost;
+    private android.appwidget.AppWidgetManager widgetManager;
     private LinearLayout sheet, rail;
     private SharedPreferences prefs;
     private final Catalog catalog = new Catalog();
@@ -56,6 +58,8 @@ public final class HomeActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         u = new Ui(this); prefs = getSharedPreferences("desktop",MODE_PRIVATE);
+        widgetHost=new android.appwidget.AppWidgetHost(this,2701);
+        widgetManager=android.appwidget.AppWidgetManager.getInstance(this);
         String saved = prefs.getString("pins","");
         if (!saved.isEmpty()) pins.addAll(Arrays.asList(saved.split("\n")));
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER);
@@ -94,7 +98,7 @@ public final class HomeActivity extends Activity {
     }
     @Override protected void onResume() { super.onResume(); resumed=true; TerminalResult.onChange = terminalListener; terminalListener.run(); updateHomeChoice(); if(media!=null)media.start(); }
     @Override protected void onPause() { resumed=false;if(media!=null)media.stop(); if (TerminalResult.onChange == terminalListener) TerminalResult.onChange = null; super.onPause(); }
-    @Override protected void onDestroy() { unregisterReceiver(packages);worker.shutdownNow();main.removeCallbacksAndMessages(null);super.onDestroy(); }
+    @Override protected void onDestroy() { if(media!=null)media.stop();widgetHost.stopListening();unregisterReceiver(packages);worker.shutdownNow();main.removeCallbacksAndMessages(null);super.onDestroy(); }
     @Override protected void onSaveInstanceState(Bundle state) {
         super.onSaveInstanceState(state);state.putString("page",page);
         state.putString("draft","term".equals(page) && input != null ? input.getText().toString() : draft);
@@ -157,12 +161,12 @@ public final class HomeActivity extends Activity {
             TextClock date=new TextClock(this);date.setFormat12Hour("EEE, dd/MM");date.setFormat24Hour("EEE, dd/MM");
             date.setTextColor(WINE);date.setTextSize(12);infoBody.addView(date);
         }
-        infoBody.addView(u.text("SAKURA  /  0.3",11,WINE,"monospace"));
+        infoBody.addView(u.text("SAKURA  /  0.3.1",11,WINE,"monospace"));
         homeChoice=u.pill("Fixar como launcher",accent,WINE,this::chooseHome);infoBody.addView(homeChoice,u.lp(FULL,32));updateHomeChoice();
         info.addView(infoBody);
         LinearLayout widgets=u.box(true);widgets.addView(info,u.lp(FULL,WRAP));
         if(prefs.getBoolean("media",true)){
-            u.gap(widgets,8);media=new NowPlaying(this,u,accent,surface);widgets.addView(media.view,u.lp(FULL,WRAP));if(resumed)media.start();
+            u.gap(widgets,8);media=new NowPlaying(this,u,accent,surface,widgetHost,widgetManager,prefs);widgets.addView(media.view,u.lp(FULL,WRAP));if(resumed)media.start();
         }
         int widgetWidth=Math.max(140,Math.min(184,getResources().getConfiguration().screenWidthDp-110));
         u.place(desktop,widgets,widgetWidth,WRAP,Gravity.TOP|Gravity.END,0,12,8,0);
@@ -336,7 +340,7 @@ public final class HomeActivity extends Activity {
         body.addView(u.commandRow(R.drawable.ic_house,"Tela inicial padrão",isDefault?"Sakura está ativo":"Escolher o Sakura",this::chooseHome));
         body.addView(u.commandRow(R.drawable.ic_palette,"Ícones rosa",prefs.getBoolean("pink_icons",true)?"Ativos · tocar para usar os originais":"Originais · tocar para usar rosa",()->{prefs.edit().putBoolean("pink_icons",!prefs.getBoolean("pink_icons",true)).apply();showHome();openSettings();}));
         body.addView(u.commandRow(R.drawable.ic_heart,"Quadro de mídia",prefs.getBoolean("media",true)?"Visível · tocar para ocultar":"Oculto · tocar para mostrar",()->{prefs.edit().putBoolean("media",!prefs.getBoolean("media",true)).apply();showHome();openSettings();}));
-        body.addView(u.commandRow(R.drawable.ic_settings_2,"Acesso às notificações","Permitir leitura de sessões de mídia",()->external(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))));
+        body.addView(u.commandRow(R.drawable.ic_settings_2,"Escolher widget de mídia","Usar o widget fornecido pelo seu player",()->{closeSheet();if(media!=null)media.choose();else toast("Ative o quadro de mídia primeiro.");}));
         body.addView(u.commandRow(R.drawable.ic_terminal,"Conexão com Termux","Configurar comandos na home",this::termHelp));
     }
     private void selectColor(boolean berry){prefs.edit().putBoolean("berry",berry).apply();showHome();openSettings();}
@@ -357,6 +361,11 @@ public final class HomeActivity extends Activity {
     }
     @Override protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);
+        if(request==NowPlaying.BIND||request==NowPlaying.CONFIGURE){
+            if(media!=null)media.result(request,result,data);
+            else if(result!=RESULT_OK){int pending=prefs.getInt("widget_pending",-1);if(pending!=-1)widgetHost.deleteAppWidgetId(pending);prefs.edit().remove("widget_pending").apply();}
+            return;
+        }
         if(request==12){updateHomeChoice();if(page.equals("settings"))openSettings();}
         if(request==14&&result==RESULT_OK&&data!=null&&data.getData()!=null){
             try{external(WallpaperManager.getInstance(this).getCropAndSetWallpaperIntent(data.getData()));}

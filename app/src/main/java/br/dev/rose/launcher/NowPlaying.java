@@ -1,112 +1,118 @@
 package br.dev.rose.launcher;
 
 import android.app.Activity;
-import android.content.ComponentName;
+import android.app.AlertDialog;
+import android.appwidget.AppWidgetHost;
+import android.appwidget.AppWidgetHostView;
+import android.appwidget.AppWidgetManager;
+import android.appwidget.AppWidgetProviderInfo;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.media.MediaMetadata;
-import android.media.session.MediaController;
-import android.media.session.MediaSessionManager;
-import android.media.session.PlaybackState;
-import android.os.Handler;
-import android.os.Looper;
-import android.provider.Settings;
-import android.view.Gravity;
-import android.view.View;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.TextView;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+import android.widget.*;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import static br.dev.rose.launcher.Ui.*;
 
 final class NowPlaying {
+    static final int BIND=701, CONFIGURE=702;
     final Activity host;
     final Ui u;
-    final LinearLayout view;
-    final ImageView cover;
-    final TextView title, artist, status;
-    final MediaSessionManager manager;
-    final ComponentName listener;
-    final Handler main = new Handler(Looper.getMainLooper());
-    MediaController controller;
-    boolean observing;
-    boolean registered;
-    final MediaSessionManager.OnActiveSessionsChangedListener changes = this::select;
-    final MediaController.Callback callback = new MediaController.Callback() {
-        @Override public void onMetadataChanged(MediaMetadata m){render();}
-        @Override public void onPlaybackStateChanged(PlaybackState s){refresh();}
-        @Override public void onSessionDestroyed(){refresh();}
-    };
-    final Runnable accessChanged = this::refresh;
-    NowPlaying(Activity activity,Ui ui,int accent,int surface){
-        host=activity;u=ui;manager=host.getSystemService(MediaSessionManager.class);
-        listener=new ComponentName(host,MediaAccess.class);
+    final LinearLayout view,body;
+    final AppWidgetHost widgets;
+    final AppWidgetManager manager;
+    final SharedPreferences prefs;
+    final int accent;
+    boolean listening;
+    NowPlaying(Activity activity,Ui ui,int accent,int surface,AppWidgetHost widgetHost,AppWidgetManager widgetManager,SharedPreferences preferences){
+        host=activity;u=ui;this.accent=accent;widgets=widgetHost;manager=widgetManager;prefs=preferences;
         view=u.box(true);view.setBackground(u.shape(surface,0,BORDER));
         LinearLayout header=u.box(false);u.pad(header,6,0,3,0);header.setBackground(u.titleBar(accent));
         header.addView(u.glyph(R.drawable.ic_heart,WINE),u.lp(16,16));u.gap(header,5);
         header.addView(u.text("Em reprodução",12,WINE,"sans-serif-medium"),new LinearLayout.LayoutParams(0,WRAP,1));
-        header.addView(u.iconButton(R.drawable.ic_ellipsis,"Permitir acesso à mídia",WINE,accent,14,this::settings),u.lp(28,30));
+        header.addView(u.iconButton(R.drawable.ic_ellipsis,"Escolher widget",WINE,accent,14,this::options),u.lp(28,30));
         view.addView(header,u.lp(FULL,30));
-        LinearLayout body=u.box(false);u.pad(body,6,7,6,7);
-        cover=new ImageView(host);cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        cover.setBackground(u.shape(accent,0,BORDER));cover.setContentDescription("Capa da mídia");
-        body.addView(cover,u.lp(48,48));u.gap(body,6);
-        LinearLayout labels=u.box(true);
-        title=u.text("Sem reprodução",12,INK,"sans-serif-medium");title.setMaxLines(2);title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        artist=u.text("",11,WINE,"sans-serif");u.single(artist);
-        status=u.text("",10,MUTE,"monospace");u.single(status);
-        labels.addView(title);u.gap(labels,3);labels.addView(artist);labels.addView(status);
-        body.addView(labels,new LinearLayout.LayoutParams(0,WRAP,1));view.addView(body,u.lp(FULL,WRAP));
-        body.setOnClickListener(v->{if(controller==null){if(!registered)settings();}else{try{android.app.PendingIntent p=controller.getSessionActivity();if(p!=null)p.send();}catch(android.app.PendingIntent.CanceledException ignored){}}});
-        empty(false);
-    }
-    void settings(){try{host.startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));}catch(RuntimeException ignored){}}
-    void start(){if(observing)return;observing=true;MediaAccess.changed=accessChanged;refresh();}
-    void stop(){observing=false;if(MediaAccess.changed==accessChanged)MediaAccess.changed=null;
-        if(registered){manager.removeOnActiveSessionsChangedListener(changes);registered=false;}
-        detach();main.removeCallbacksAndMessages(null);
-    }
-    void detach(){if(controller!=null){controller.unregisterCallback(callback);controller=null;}}
-    void refresh(){
-        if(!observing)return;
-        try{
-            if(!registered){manager.addOnActiveSessionsChangedListener(changes,listener,main);registered=true;}
-            select(manager.getActiveSessions(listener));
-        }catch(SecurityException e){if(registered){manager.removeOnActiveSessionsChangedListener(changes);registered=false;}detach();empty(true);}
-    }
-    void select(List<MediaController> sessions){
-        if(!observing)return;
-        MediaController best=null;
-        if(sessions!=null)for(MediaController c:sessions){
-            if(best==null)best=c;
-            PlaybackState s=c.getPlaybackState();
-            if(s!=null&&s.getState()==PlaybackState.STATE_PLAYING){best=c;break;}
-        }
-        if(best==null){detach();empty(false);return;}
-        if(controller==null||!controller.getSessionToken().equals(best.getSessionToken())){
-            detach();controller=best;controller.registerCallback(callback,main);
-        }
+        body=u.box(true);view.addView(body,u.lp(FULL,WRAP));
         render();
     }
-    void empty(boolean permission){
-        cover.setImageResource(R.drawable.sakura_music);
-        title.setText(permission?"Ativar mídia":"Sem reprodução");
-        artist.setText(permission?"Toque para permitir":"Nenhuma faixa");
-        status.setText(permission?"ACESSO":"STANDBY");
-    }
+    void start(){if(listening)return;try{widgets.startListening();listening=true;}catch(RuntimeException ignored){}}
+    void stop(){if(listening){widgets.stopListening();listening=false;}}
     void render(){
-        if(!observing||controller==null)return;
-        MediaMetadata m=controller.getMetadata();
-        CharSequence name=m==null?null:m.getText(MediaMetadata.METADATA_KEY_TITLE);
-        if((name==null||name.length()==0)&&m!=null)name=m.getText(MediaMetadata.METADATA_KEY_DISPLAY_TITLE);
-        CharSequence by=m==null?null:m.getText(MediaMetadata.METADATA_KEY_ARTIST);
-        if((by==null||by.length()==0)&&m!=null)by=m.getText(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE);
-        if(by==null||by.length()==0){try{by=host.getPackageManager().getApplicationLabel(host.getPackageManager().getApplicationInfo(controller.getPackageName(),0));}catch(Exception e){by="Mídia";}}
-        title.setText(name==null||name.length()==0?"Reprodução":name);artist.setText(by);
-        Bitmap art=m==null?null:m.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON);
-        if(art==null&&m!=null)art=m.getBitmap(MediaMetadata.METADATA_KEY_ART);
-        if(art==null&&m!=null)art=m.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
-        if(art==null)cover.setImageResource(R.drawable.sakura_music);else cover.setImageBitmap(art);
-        PlaybackState state=controller.getPlaybackState();status.setText(state!=null&&state.getState()==PlaybackState.STATE_PLAYING?"PLAYING":"PAUSADO");
+        body.removeAllViews();
+        int id=prefs.getInt("media_widget",-1);
+        AppWidgetProviderInfo info=id<0?null:manager.getAppWidgetInfo(id);
+        if(info!=null){
+            try{
+                AppWidgetHostView w=widgets.createView(host,id,info);
+                w.setPadding(0,0,0,0);
+                int width=Math.max(140,Math.min(184,host.getResources().getConfiguration().screenWidthDp-110));
+                int h=Math.max(76,Math.min(150,(int)(info.minHeight/host.getResources().getDisplayMetrics().density)));
+                body.addView(w,u.lp(FULL,h));
+                w.updateAppWidgetSize(null,width,h,width,h);
+                return;
+            }catch(RuntimeException ignored){}
+        }
+        LinearLayout row=u.box(false);u.pad(row,6,8,6,8);
+        ImageView art=new ImageView(host);art.setImageResource(R.drawable.sakura_music);row.addView(art,u.lp(42,42));u.gap(row,7);
+        LinearLayout words=u.box(true);words.addView(u.text("Adicionar mídia",12,INK,"sans-serif-medium"));
+        words.addView(u.text("Widget do player",11,WINE,"sans-serif"));row.addView(words,new LinearLayout.LayoutParams(0,WRAP,1));
+        body.addView(row);row.setOnClickListener(v->choose());
+    }
+    void options(){
+        new AlertDialog.Builder(host).setTitle("Quadro de mídia").setItems(new String[]{"Escolher widget","Remover widget"},(d,i)->{
+            if(i==0)choose();else{int old=prefs.getInt("media_widget",-1);if(old>=0)widgets.deleteAppWidgetId(old);prefs.edit().remove("media_widget").apply();render();}
+        }).show();
+    }
+    void choose(){
+        List<AppWidgetProviderInfo> all=manager.getInstalledProviders();
+        ArrayList<AppWidgetProviderInfo> list=new ArrayList<>(all);
+        if(list.isEmpty()){new AlertDialog.Builder(host).setTitle("Nenhum widget disponível").setMessage("Instale um player que ofereça um widget Android de mídia.").setPositiveButton("OK",null).show();return;}
+        Collections.sort(list,(a,b)->a.loadLabel(host.getPackageManager()).compareToIgnoreCase(b.loadLabel(host.getPackageManager())));
+        String[] labels=new String[list.size()];
+        for(int i=0;i<list.size();i++){
+            AppWidgetProviderInfo item=list.get(i);
+            String app=item.provider.getPackageName();
+            try{app=host.getPackageManager().getApplicationLabel(host.getPackageManager().getApplicationInfo(app,0)).toString();}catch(Exception ignored){}
+            labels[i]=app+" — "+item.loadLabel(host.getPackageManager());
+        }
+        new AlertDialog.Builder(host).setTitle("Escolha o widget do player").setItems(labels,(d,i)->bind(list.get(i))).setNegativeButton("Cancelar",null).show();
+    }
+    void clearPending(){
+        int old=prefs.getInt("widget_pending",-1);
+        if(old>=0)widgets.deleteAppWidgetId(old);
+        prefs.edit().remove("widget_pending").apply();
+    }
+    void bind(AppWidgetProviderInfo info){
+        clearPending();
+        int id=widgets.allocateAppWidgetId();prefs.edit().putInt("widget_pending",id).apply();
+        try{
+            if(manager.bindAppWidgetIdIfAllowed(id,info.provider)){configure(id);return;}
+            Intent intent=new Intent(AppWidgetManager.ACTION_APPWIDGET_BIND);
+            intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,id);
+            intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER,info.provider);
+            host.startActivityForResult(intent,BIND);
+        }catch(RuntimeException e){clearPending();Toast.makeText(host,"Não foi possível adicionar esse widget.",Toast.LENGTH_SHORT).show();}
+    }
+    void configure(int id){
+        AppWidgetProviderInfo info=manager.getAppWidgetInfo(id);
+        if(info==null){clearPending();return;}
+        if(info.configure!=null){
+            try{widgets.startAppWidgetConfigureActivityForResult(host,id,0,CONFIGURE,null);return;}
+            catch(RuntimeException e){clearPending();Toast.makeText(host,"Configuração do widget indisponível.",Toast.LENGTH_SHORT).show();return;}
+        }
+        finish(id);
+    }
+    void result(int request,int result,Intent data){
+        int id=prefs.getInt("widget_pending",-1);
+        if(id<0)return;
+        if(result!=Activity.RESULT_OK){clearPending();return;}
+        if(request==BIND)configure(id);else finish(id);
+    }
+    void finish(int id){
+        int old=prefs.getInt("media_widget",-1);
+        if(old>=0&&old!=id)widgets.deleteAppWidgetId(old);
+        prefs.edit().putInt("media_widget",id).remove("widget_pending").apply();
+        render();
     }
 }
