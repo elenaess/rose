@@ -1,5 +1,3 @@
-# Sakura
+# Sakura 0.4.0
 
-Launcher Android nativo em Java com tema rosa retrô. A versão 0.3.1 remove completamente o serviço de acesso às notificações e utiliza widgets Android fornecidos pelos próprios aplicativos de mídia, autorizados pelo seletor do sistema. O conteúdo do widget (capa, faixa e controles) depende do player instalado e do tamanho disponível. Nenhuma leitura de notificações é usada.
-
-APK: [GitHub Actions](https://github.com/elenaess/rose/actions).
+Launcher Android nativo rosa, com lista vertical de apps na home (favoritos primeiro), gaveta alfabética com índice por toque e arraste, animações de 90 ms, ícone adaptativo e barra inferior sem contorno. Widgets de mídia nativos e Termux preservados. APK em [Actions](https://github.com/elenaess/rose/actions).

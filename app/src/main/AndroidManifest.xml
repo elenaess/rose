@@ -4,7 +4,7 @@
         <intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent>
         <package android:name="com.termux"/>
     </queries>
-    <application android:label="Sakura" android:icon="@drawable/rose_logo" android:theme="@style/RoseTheme" android:allowBackup="false" android:supportsRtl="true">
+    <application android:label="Sakura" android:icon="@mipmap/sakura_icon" android:roundIcon="@mipmap/sakura_icon" android:theme="@style/RoseTheme" android:allowBackup="false" android:supportsRtl="true">
         <activity android:name=".HomeActivity" android:exported="true" android:launchMode="singleTask"
             android:enableOnBackInvokedCallback="false" android:windowSoftInputMode="adjustResize"
             android:stateNotNeeded="true">

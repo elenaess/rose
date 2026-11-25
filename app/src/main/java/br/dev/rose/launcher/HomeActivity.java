@@ -32,6 +32,10 @@ public final class HomeActivity extends Activity {
     private android.appwidget.AppWidgetHost widgetHost;
     private android.appwidget.AppWidgetManager widgetManager;
     private LinearLayout sheet, rail;
+    private ListView homeList, drawerList;
+    private HomeList homeAdapter;
+    private AlphabetIndex alphabet;
+    private static final long MOTION=90L;
     private SharedPreferences prefs;
     private final Catalog catalog = new Catalog();
     private final ArrayList<Catalog.Entry> apps = new ArrayList<>();
@@ -144,8 +148,19 @@ public final class HomeActivity extends Activity {
         if(getWindow().getInsetsController()!=null)getWindow().getInsetsController().setSystemBarsAppearance(WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
         desktop=new FrameLayout(this);safe.addView(desktop);
         boolean compact=getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE;
-        rail=u.box(true);u.pad(rail,6,8,6,6);
-        u.place(desktop,rail,92,WRAP,Gravity.TOP|Gravity.START,4,8,0,60);
+        int screen=getResources().getConfiguration().screenWidthDp;
+        int widgetWidth=Math.max(136,Math.min(184,screen/2-10));
+        int railWidth=Math.max(120,Math.min(240,screen-widgetWidth-24));
+        rail=u.box(true);u.pad(rail,3,3,3,3);
+        u.place(desktop,rail,railWidth,FULL,Gravity.TOP|Gravity.START,6,8,0,58);
+        homeList=new ListView(this);homeList.setDivider(null);homeList.setDividerHeight(0);
+        homeList.setCacheColorHint(Color.TRANSPARENT);homeList.setVerticalScrollBarEnabled(false);
+        homeList.setSelector(new android.graphics.drawable.ColorDrawable(0x30ffb5d1));
+        homeList.setClipToPadding(false);homeList.setPadding(0,u.dp(3),0,u.dp(5));
+        homeAdapter=new HomeList();homeList.setAdapter(homeAdapter);
+        rail.addView(homeList,u.flex(true));
+        homeList.setOnItemClickListener((a,v,pos,id)->{if(pos==0)openApps(false);else if(pos==1)openTerm();else launch(homeAdapter.items.get(pos-2));});
+        homeList.setOnItemLongClickListener((a,v,pos,id)->{if(pos<2)return false;pinDialog(homeAdapter.items.get(pos-2));return true;});
         drawRail();
         LinearLayout info=u.box(true);info.setBackground(u.shape(surface,0,BORDER));
         LinearLayout title=u.box(false);title.setBackground(u.titleBar(accent));u.pad(title,7,0,4,0);
@@ -161,24 +176,23 @@ public final class HomeActivity extends Activity {
             TextClock date=new TextClock(this);date.setFormat12Hour("EEE, dd/MM");date.setFormat24Hour("EEE, dd/MM");
             date.setTextColor(WINE);date.setTextSize(12);infoBody.addView(date);
         }
-        infoBody.addView(u.text("SAKURA  /  0.3.1",11,WINE,"monospace"));
+        infoBody.addView(u.text("SAKURA  /  0.4",11,WINE,"monospace"));
         homeChoice=u.pill("Fixar como launcher",accent,WINE,this::chooseHome);infoBody.addView(homeChoice,u.lp(FULL,32));updateHomeChoice();
         info.addView(infoBody);
         LinearLayout widgets=u.box(true);widgets.addView(info,u.lp(FULL,WRAP));
         if(prefs.getBoolean("media",true)){
             u.gap(widgets,8);media=new NowPlaying(this,u,accent,surface,widgetHost,widgetManager,prefs);widgets.addView(media.view,u.lp(FULL,WRAP));if(resumed)media.start();
         }
-        int widgetWidth=Math.max(140,Math.min(184,getResources().getConfiguration().screenWidthDp-110));
         u.place(desktop,widgets,widgetWidth,WRAP,Gravity.TOP|Gravity.END,0,12,8,0);
-        LinearLayout dock=u.box(false);u.pad(dock,3,3,3,3);dock.setBackground(u.shape(taskbar,0,WINE));
+        LinearLayout dock=u.box(false);u.pad(dock,3,3,3,3);dock.setBackgroundColor(taskbar);
         LinearLayout menu=u.box(false);u.pad(menu,9,0,9,0);menu.setGravity(Gravity.CENTER);
-        u.action(menu,accent,0,()->openApps(false));ImageView menuLogo=new ImageView(this);menuLogo.setImageResource(R.drawable.rose_logo);menu.addView(menuLogo,u.lp(24,24));u.gap(menu,5);
+        u.flatAction(menu,0x35ffffff,()->openApps(false));ImageView menuLogo=new ImageView(this);menuLogo.setImageResource(R.drawable.rose_logo);menu.addView(menuLogo,u.lp(24,24));u.gap(menu,5);
         menu.addView(u.text("Menu",14,INK,"sans-serif-medium"));dock.addView(menu,u.lp(WRAP,46));u.gap(dock,3);
-        dock.addView(u.iconButton(R.drawable.ic_search,"Buscar aplicativos",WINE,accent,20,()->openApps(true)),u.lp(42,46));
-        dock.addView(u.iconButton(R.drawable.ic_terminal,"Terminal",WINE,accent,20,this::openTerm),u.lp(42,46));
-        dock.addView(u.iconButton(R.drawable.ic_sliders_horizontal,"Ajustes",WINE,accent,20,this::openSettings),u.lp(42,46));
+        dock.addView(u.flatIcon(R.drawable.ic_search,"Buscar aplicativos",WINE,20,()->openApps(true)),u.lp(42,46));
+        dock.addView(u.flatIcon(R.drawable.ic_terminal,"Terminal",WINE,20,this::openTerm),u.lp(42,46));
+        dock.addView(u.flatIcon(R.drawable.ic_sliders_horizontal,"Ajustes",WINE,20,this::openSettings),u.lp(42,46));
         u.grow(dock);
-        TextClock clock=new TextClock(this);clock.setFormat24Hour("HH:mm");clock.setFormat12Hour("h:mm");clock.setTextColor(INK);clock.setTextSize(13);clock.setTypeface(Typeface.MONOSPACE);clock.setGravity(Gravity.CENTER);clock.setBackground(u.shape(accent,0,BORDER));
+        TextClock clock=new TextClock(this);clock.setFormat24Hour("HH:mm");clock.setFormat12Hour("h:mm");clock.setTextColor(INK);clock.setTextSize(13);clock.setTypeface(Typeface.MONOSPACE);clock.setGravity(Gravity.CENTER);clock.setBackgroundColor(Color.TRANSPARENT);
         dock.addView(clock,u.lp(58,46));
         u.place(desktop,dock,FULL,WRAP,Gravity.BOTTOM,0,0,0,0);
         desktop.setOnLongClickListener(v->{openSettings();return true;});
@@ -199,30 +213,49 @@ public final class HomeActivity extends Activity {
     }
     private void updateHomeChoice(){if(homeChoice!=null)homeChoice.setVisibility(getSystemService(RoleManager.class).isRoleHeld(RoleManager.ROLE_HOME)?View.GONE:View.VISIBLE);}
     private void drawRail() {
-        if(rail==null)return;rail.removeAllViews();
-        rail.addView(shortcut("Aplicativos",getDrawable(R.drawable.sakura_folder),()->openApps(false)),u.lp(FULL,72));
-        rail.addView(shortcut("Terminal",getDrawable(R.drawable.sakura_terminal),this::openTerm),u.lp(FULL,72));
-        int max=getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE?1:4;
-        int visible=0;for(String key:pins){Catalog.Entry item=entry(key);if(item==null)continue;
-            View b=shortcut(item.name,styledIcon(item),()->launch(item));b.setOnLongClickListener(v->{pinDialog(item);return true;});rail.addView(b,u.lp(FULL,72));if(++visible>=max)break;
+        if(homeAdapter==null)return;
+        homeAdapter.items.clear();
+        HashSet<String> seen=new HashSet<>();
+        for(String key:pins){Catalog.Entry e=entry(key);if(e!=null&&seen.add(key))homeAdapter.items.add(e);}
+        for(Catalog.Entry e:apps)if(seen.add(e.key))homeAdapter.items.add(e);
+        homeAdapter.notifyDataSetChanged();
+    }
+    final class HomeList extends BaseAdapter {
+        final ArrayList<Catalog.Entry> items=new ArrayList<>();
+        public int getCount(){return items.size()+2;}
+        public Object getItem(int i){return i<2?null:items.get(i-2);}
+        public long getItemId(int i){return i;}
+        public View getView(int i,View recycled,android.view.ViewGroup parent){
+            LinearLayout row=(LinearLayout)recycled;
+            if(row==null){
+                row=u.box(false);u.pad(row,5,4,5,4);row.setLayoutParams(new AbsListView.LayoutParams(FULL,u.dp(54)));
+                ImageView img=new ImageView(HomeActivity.this);img.setScaleType(ImageView.ScaleType.FIT_CENTER);row.addView(img,u.lp(34,34));u.gap(row,7);
+                TextView label=u.text("",14,Color.WHITE,"sans-serif-medium");u.single(label);
+                label.setShadowLayer(u.dp(3),0,u.dp(1),Color.BLACK);
+                label.setBackground(u.shape(0x7030202c,0,0));u.pad(label,4,3,4,3);
+                row.addView(label,new LinearLayout.LayoutParams(0,WRAP,1));
+            }
+            ImageView img=(ImageView)row.getChildAt(0);TextView label=(TextView)row.getChildAt(2);
+            if(i<2){img.setImageResource(i==0?R.drawable.sakura_folder:R.drawable.sakura_terminal);label.setText(i==0?"Aplicativos":"Terminal");}
+            else{Catalog.Entry e=items.get(i-2);img.setImageDrawable(styledIcon(e));label.setText(e.name);}
+            return row;
         }
     }
     private Catalog.Entry entry(String key) {for (Catalog.Entry a:apps) if(a.key.equals(key))return a;return null;}
     private void pinDialog(Catalog.Entry item) {
         boolean exists=pins.contains(item.key);
         new AlertDialog.Builder(this).setTitle(item.name)
-            .setItems(new String[]{exists?"Remover dos favoritos":"Fixar na lateral","Informações do app"},(d,which)->{
+            .setItems(new String[]{exists?"Remover dos favoritos":"Fixar no topo","Informações do app"},(d,which)->{
                 if(which==1) {external(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+item.info.activityInfo.packageName)));return;}
                 pins.removeIf(key->entry(key)==null);
                 if(exists)pins.remove(item.key);
-                else if(pins.size()<4)pins.add(item.key);
-                else {toast("Os quatro espaços estão ocupados. Remova um favorito para trocar.");return;}
+                else pins.add(item.key);
                 savePins();drawRail();if(page.equals("apps"))refreshApps();
             }).show();
     }
     private void launch(Catalog.Entry item) {
         Intent launch=Intent.makeMainActivity(ComponentName.unflattenFromString(item.key));
-        if(external(launch))closeSheet();
+        if(external(launch))closeSheet(false);
     }
     private boolean external(Intent intent) {
         try {startActivity(intent);return true;}
@@ -232,13 +265,24 @@ public final class HomeActivity extends Activity {
     private void keyboardOff(){
         if(getCurrentFocus()!=null)getSystemService(InputMethodManager.class).hideSoftInputFromWindow(getCurrentFocus().getWindowToken(),0);
     }
-    private void closeSheet(){
-        if (page.equals("term") && input!=null) draft=input.getText().toString();
-        keyboardOff();if(overlay!=null)safe.removeView(overlay);overlay=null;page="home";
+    private void closeSheet(){closeSheet(true);}
+    private void closeSheet(boolean animate){
+        if(page.equals("term")&&input!=null)draft=input.getText().toString();
+        FrameLayout old=overlay;LinearLayout oldSheet=sheet;
+        overlay=null;page="home";keyboardOff();
+        if(old!=null){
+            if(oldSheet!=null)oldSheet.animate().cancel();
+            if(animate&&oldSheet!=null&&android.animation.ValueAnimator.areAnimatorsEnabled()){
+                old.setOnClickListener(null);
+                oldSheet.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+                oldSheet.animate().alpha(0f).translationY(u.dp(10)).setDuration(MOTION)
+                    .setInterpolator(new android.view.animation.AccelerateInterpolator()).withEndAction(()->safe.removeView(old)).start();
+            }else safe.removeView(old);
+        }
         desktop.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
     }
     private void panel(String id,String title,int icon) {
-        closeSheet();page=id;
+        closeSheet(false);page=id;
         desktop.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
         overlay=new FrameLayout(this);safe.addView(overlay);
         overlay.setBackgroundColor(Color.TRANSPARENT);overlay.setOnClickListener(v->closeSheet());
@@ -248,6 +292,7 @@ public final class HomeActivity extends Activity {
         int available=getResources().getConfiguration().screenWidthDp;
         if(available>548)p.width=u.dp(516);
         p.setMargins(u.dp(7),u.dp(16),u.dp(7),u.dp(59));overlay.addView(sheet,p);sheet.requestFocus();
+        if(android.animation.ValueAnimator.areAnimatorsEnabled()){sheet.setAlpha(.65f);sheet.setTranslationY(u.dp(12));sheet.animate().alpha(1f).translationY(0f).setDuration(MOTION).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();}
         LinearLayout head=u.box(false);u.pad(head,7,0,3,0);head.setBackground(u.titleBar(accent));
         head.addView(u.glyph(icon,WINE),u.lp(22,22));u.gap(head,10);
         head.addView(u.text(title+" — Sakura",17,INK,"sans-serif-medium"),new LinearLayout.LayoutParams(0,WRAP,1));
@@ -265,10 +310,12 @@ public final class HomeActivity extends Activity {
         allTab=u.pill("Todos",accent,INK,()->{filter="all";refreshApps();});
         pinTab=u.pill("Favoritos",accent,INK,()->{filter="pins";refreshApps();});
         tabs.addView(allTab,u.lp(WRAP,48));u.gap(tabs,5);tabs.addView(pinTab,u.lp(WRAP,48));sheet.addView(tabs);
-        ListView list=new ListView(this);list.setDivider(new android.graphics.drawable.ColorDrawable(BORDER));list.setDividerHeight(u.dp(1));list.setFastScrollEnabled(true);
+        ListView list=new ListView(this);drawerList=list;list.setDivider(null);list.setDividerHeight(0);list.setFastScrollEnabled(false);
         list.setCacheColorHint(Color.TRANSPARENT);list.setVerticalScrollBarEnabled(false);
         TextView empty=u.text("",15,MUTE,"sans-serif");empty.setGravity(Gravity.CENTER);empty.setTag("empty");
-        FrameLayout space=new FrameLayout(this);sheet.addView(space,u.flex(true));space.addView(empty);space.addView(list);list.setEmptyView(empty);
+        LinearLayout scrolling=u.box(false);sheet.addView(scrolling,u.flex(true));
+        FrameLayout space=new FrameLayout(this);scrolling.addView(space,u.flex(false));space.addView(empty);space.addView(list);list.setEmptyView(empty);
+        alphabet=new AlphabetIndex(this);scrolling.addView(alphabet,u.lp(32,FULL));
         adapter=new AppList();list.setAdapter(adapter);filter="all";refreshApps();
         query.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence s,int st,int n,int after){}
@@ -290,7 +337,7 @@ public final class HomeActivity extends Activity {
         pinTab.setBackgroundTintList(android.content.res.ColorStateList.valueOf(pinTab.isSelected()?accent:surface));
         TextView empty=sheet.findViewWithTag("empty");
         if(empty!=null)empty.setText(!loaded?"Lendo os apps…":!term.isEmpty()?"Nenhum aplicativo encontrado.":filter.equals("pins")?"Seus favoritos aparecem aqui. Toque no alfinete de um app em Todos.":"Nenhum aplicativo disponível neste perfil.");
-        adapter.notifyDataSetChanged();
+        adapter.notifyDataSetChanged();if(alphabet!=null)alphabet.invalidate();
     }
     final class AppList extends BaseAdapter {
         final ArrayList<Catalog.Entry> visible=new ArrayList<>();
@@ -300,7 +347,7 @@ public final class HomeActivity extends Activity {
         public View getView(int i,View recycle,android.view.ViewGroup parent) {
             LinearLayout row=(LinearLayout)recycle;
             if(row==null) {
-                row=u.box(false);u.pad(row,7,0,0,0);row.setMinimumHeight(u.dp(57));
+                row=u.box(false);u.pad(row,7,0,0,0);row.setMinimumHeight(u.dp(56));row.setLayoutParams(new AbsListView.LayoutParams(FULL,u.dp(56)));
                 row.addView(new ImageView(HomeActivity.this),u.lp(34,34));u.gap(row,13);
                 TextView label=u.text("",16,INK,"sans-serif");u.single(label);
                 row.addView(label,new LinearLayout.LayoutParams(0,WRAP,1));
@@ -315,6 +362,49 @@ public final class HomeActivity extends Activity {
             pin.setColorFilter(pins.contains(e.key)?0xffaa245d:0xff876c77);
             pin.setContentDescription("Opções de "+e.name);pin.setOnClickListener(v->pinDialog(e));
             return row;
+        }
+    }
+    final class AlphabetIndex extends View {
+        final android.graphics.Paint paint=new android.graphics.Paint(3);
+        final String letters="#ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        char active=0;
+        AlphabetIndex(Context c){super(c);setContentDescription("Índice alfabético: deslize para localizar aplicativos");setFocusable(false);}
+        @Override protected void onDraw(android.graphics.Canvas canvas){
+            super.onDraw(canvas);
+            float step=getHeight()/27f;
+            paint.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
+            paint.setTextSize(Math.min(u.dp(12),step*.83f));paint.setTextAlign(android.graphics.Paint.Align.CENTER);
+            for(int i=0;i<27;i++){
+                char letter=letters.charAt(i);float cy=step*(i+.5f);
+                if(active==letter){paint.setColor(accent);canvas.drawCircle(getWidth()/2f,cy,Math.min(getWidth()/2f-1,step*.49f),paint);}
+                paint.setColor(active==letter?WINE:MUTE);
+                canvas.drawText(String.valueOf(letter),getWidth()/2f,cy-(paint.ascent()+paint.descent())/2,paint);
+            }
+        }
+        @Override public boolean onTouchEvent(MotionEvent e){
+            int action=e.getActionMasked();
+            if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_MOVE){
+                getParent().requestDisallowInterceptTouchEvent(true);
+                int index=Math.max(0,Math.min(26,(int)(e.getY()*27/Math.max(1,getHeight()))));
+                char target=letters.charAt(index);
+                if(active!=target){active=target;invalidate();jump(target);}
+                return true;
+            }
+            if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL){active=0;invalidate();getParent().requestDisallowInterceptTouchEvent(false);if(action==MotionEvent.ACTION_UP)performClick();return true;}
+            return true;
+        }
+        @Override public boolean performClick(){super.performClick();return true;}
+        void jump(char target){
+            if(adapter==null||drawerList==null)return;
+            int fallback=-1;
+            for(int i=0;i<adapter.visible.size();i++){
+                String name=adapter.visible.get(i).search;
+                char letter=name.isEmpty()?'#':Character.toUpperCase(name.charAt(0));
+                if(letter<'A'||letter>'Z')letter='#';
+                if(letter==target){drawerList.setSelectionFromTop(i,0);return;}
+                if(fallback<0&&letter>target)fallback=i;
+            }
+            if(fallback>=0)drawerList.setSelectionFromTop(fallback,0);
         }
     }
     private LinearLayout scrollingContent(){

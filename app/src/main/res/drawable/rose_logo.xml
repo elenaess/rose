@@ -1,5 +1,5 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
-<path android:fillColor="#F8B0CF" android:strokeColor="#A84F75" android:strokeWidth="1.2" android:pathData="M6,2H42Q46,2 46,6V42Q46,46 42,46H6Q2,46 2,42V6Q2,2 6,2Z"/>
-<path android:fillColor="#FFF5F8" android:strokeColor="#C85E8B" android:strokeWidth="1" android:pathData="M24,21C15,4 4,19 18,24C3,32 15,43 24,29C33,43 45,32 30,24C44,19 33,4 24,21Z"/>
-<path android:fillColor="#A54871" android:pathData="M24,21a3,3 0,1 1,0 6a3,3 0,1 1,0 -6"/>
-</vector>
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108"><path android:fillColor="#FDE5EC" android:pathData="M0,0H108V108H0Z"/><group android:pivotX="54" android:pivotY="54" android:rotation="0"><path android:fillColor="#C64B81" android:pathData="M54,53 C45,48 40,40 43,33 C45,28 50,29 54,34 C58,29 63,28 65,33 C68,40 63,48 54,53 Z"/></group>
+<group android:pivotX="54" android:pivotY="54" android:rotation="72"><path android:fillColor="#C64B81" android:pathData="M54,53 C45,48 40,40 43,33 C45,28 50,29 54,34 C58,29 63,28 65,33 C68,40 63,48 54,53 Z"/></group>
+<group android:pivotX="54" android:pivotY="54" android:rotation="144"><path android:fillColor="#C64B81" android:pathData="M54,53 C45,48 40,40 43,33 C45,28 50,29 54,34 C58,29 63,28 65,33 C68,40 63,48 54,53 Z"/></group>
+<group android:pivotX="54" android:pivotY="54" android:rotation="216"><path android:fillColor="#C64B81" android:pathData="M54,53 C45,48 40,40 43,33 C45,28 50,29 54,34 C58,29 63,28 65,33 C68,40 63,48 54,53 Z"/></group>
+<group android:pivotX="54" android:pivotY="54" android:rotation="288"><path android:fillColor="#C64B81" android:pathData="M54,53 C45,48 40,40 43,33 C45,28 50,29 54,34 C58,29 63,28 65,33 C68,40 63,48 54,53 Z"/></group><path android:fillColor="#FFF4F6" android:pathData="M54,49a5,5 0,1 1,0 10a5,5 0,1 1,0 -10"/></vector>

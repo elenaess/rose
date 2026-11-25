@@ -34,6 +34,22 @@ final class Ui {
         view.setOnClickListener(v -> run.run());
         view.setFocusable(true);
     }
+    void flatAction(View view,int color,Runnable run){
+        view.setBackground(new RippleDrawable(ColorStateList.valueOf(0x30753851),shape(color,0,0),shape(Color.WHITE,0,0)));
+        view.setOnClickListener(v->run.run());view.setFocusable(true);
+        view.setOnTouchListener((v,event)->{
+            if(android.animation.ValueAnimator.areAnimatorsEnabled()){
+                int a=event.getActionMasked();
+                if(a==android.view.MotionEvent.ACTION_DOWN)v.animate().scaleX(.96f).scaleY(.96f).setDuration(90).start();
+                else if(a==android.view.MotionEvent.ACTION_UP||a==android.view.MotionEvent.ACTION_CANCEL)v.animate().scaleX(1f).scaleY(1f).setDuration(90).start();
+            }
+            return false;
+        });
+    }
+    FrameLayout flatIcon(int icon,String label,int tint,int size,Runnable click){
+        FrameLayout b=new FrameLayout(c);b.setContentDescription(label);b.setTooltipText(label);
+        b.addView(glyph(icon,tint),frame(size,size,Gravity.CENTER));flatAction(b,Color.TRANSPARENT,click);return b;
+    }
     TextView text(String value, float size, int color, String family) {
         TextView v = new TextView(c);
         v.setText(value); v.setTextColor(color); v.setTextSize(size);
