@@ -19,7 +19,7 @@ final class NowPlaying {
     static final int BIND=701, CONFIGURE=702;
     final Activity host;
     final Ui u;
-    final LinearLayout view,body;
+    final LinearLayout view,body,header;
     final AppWidgetHost widgets;
     final AppWidgetManager manager;
     final SharedPreferences prefs;
@@ -28,7 +28,7 @@ final class NowPlaying {
     NowPlaying(Activity activity,Ui ui,int accent,int surface,AppWidgetHost widgetHost,AppWidgetManager widgetManager,SharedPreferences preferences){
         host=activity;u=ui;this.accent=accent;widgets=widgetHost;manager=widgetManager;prefs=preferences;
         view=u.box(true);view.setBackground(u.shape(surface,0,BORDER));
-        LinearLayout header=u.box(false);u.pad(header,6,0,3,0);header.setBackground(u.titleBar(accent));
+        header=u.box(false);u.pad(header,6,0,3,0);header.setBackground(u.titleBar(accent));
         header.addView(u.glyph(R.drawable.ic_heart,WINE),u.lp(16,16));u.gap(header,5);
         header.addView(u.text("Em reprodução",12,WINE,"sans-serif-medium"),new LinearLayout.LayoutParams(0,WRAP,1));
         header.addView(u.iconButton(R.drawable.ic_ellipsis,"Escolher widget",WINE,accent,14,this::options),u.lp(28,30));
@@ -46,7 +46,7 @@ final class NowPlaying {
             try{
                 AppWidgetHostView w=widgets.createView(host,id,info);
                 w.setPadding(0,0,0,0);
-                int width=Math.max(140,Math.min(184,host.getResources().getConfiguration().screenWidthDp-110));
+                int width=Math.max(150,Math.min(218,host.getResources().getConfiguration().screenWidthDp-18));
                 int h=Math.max(76,Math.min(150,(int)(info.minHeight/host.getResources().getDisplayMetrics().density)));
                 body.addView(w,u.lp(FULL,h));
                 w.updateAppWidgetSize(null,width,h,width,h);
