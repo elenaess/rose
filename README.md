@@ -1,5 +1,7 @@
-# Rosé Launcher
+# Sakura
 
-Launcher Android nativo inspirado em desktops clássicos, com tema rosa, atalhos, barra de tarefas e integração com Termux.
+Launcher Android nativo em Java, com estética de desktop clássico rosa. A versão 0.3.0 preserva o identificador Android para atualizar instalações existentes, usa o papel de parede do sistema, oferece ícones rosa opcionais, barra inferior rosa, configuração de launcher padrão e um quadro de mídia local.
 
-O projeto v0.2.0 Classic Desktop usa Java e Gradle. O APK de teste será gerado pelo GitHub Actions quando o código-fonte estiver no repositório.
+Para mostrar as mídias, habilite o acesso às notificações na opção do quadro. O Android exige essa autorização para consultar sessões de mídia de outros apps; o Sakura não armazena nem transmite notificações. A capa depende dos metadados fornecidos pelo player.
+
+APK de teste: [GitHub Actions](https://github.com/elenaess/rose/actions).

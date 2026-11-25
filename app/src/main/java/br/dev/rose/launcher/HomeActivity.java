@@ -27,6 +27,8 @@ import java.util.concurrent.Executors;
 public final class HomeActivity extends Activity {
     private Ui u;
     private FrameLayout base, safe, desktop, overlay;
+    private View navFill, homeChoice;
+    private NowPlaying media;
     private LinearLayout sheet, rail;
     private SharedPreferences prefs;
     private final Catalog catalog = new Catalog();
@@ -44,6 +46,8 @@ public final class HomeActivity extends Activity {
     private View send, abandon;
     private String draft = "";
     private int accent, surface;
+    private int taskbar;
+    private boolean resumed;
     private final Runnable terminalListener = () -> { if ("term".equals(page)) updateTerminal(); };
     private final BroadcastReceiver packages = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent intent) { catalog.icons.evictAll(); loadApps(); }
@@ -62,9 +66,15 @@ public final class HomeActivity extends Activity {
         base = new FrameLayout(this);
         base.setBackgroundColor(Color.TRANSPARENT);
         safe = new FrameLayout(this);base.addView(safe);
+        navFill = new View(this);base.addView(navFill,new FrameLayout.LayoutParams(-1,0,Gravity.BOTTOM));
+        navFill.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         base.setOnApplyWindowInsetsListener((v, in) -> {
             Insets bounds = in.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime());
             safe.setPadding(bounds.left,bounds.top,bounds.right,bounds.bottom);
+            FrameLayout.LayoutParams bar=(FrameLayout.LayoutParams)navFill.getLayoutParams();
+            int bottom=in.getInsets(WindowInsets.Type.navigationBars()).bottom;
+            if(bar.height!=bottom){bar.height=bottom;navFill.setLayoutParams(bar);}
+            navFill.setVisibility(in.isVisible(WindowInsets.Type.ime())?View.GONE:View.VISIBLE);
             return in;
         });
         setContentView(base);
@@ -82,8 +92,8 @@ public final class HomeActivity extends Activity {
             else if ("settings".equals(prev)) openSettings();
         }
     }
-    @Override protected void onResume() { super.onResume(); TerminalResult.onChange = terminalListener; terminalListener.run(); }
-    @Override protected void onPause() { if (TerminalResult.onChange == terminalListener) TerminalResult.onChange = null; super.onPause(); }
+    @Override protected void onResume() { super.onResume(); resumed=true; TerminalResult.onChange = terminalListener; terminalListener.run(); updateHomeChoice(); if(media!=null)media.start(); }
+    @Override protected void onPause() { resumed=false;if(media!=null)media.stop(); if (TerminalResult.onChange == terminalListener) TerminalResult.onChange = null; super.onPause(); }
     @Override protected void onDestroy() { unregisterReceiver(packages);worker.shutdownNow();main.removeCallbacksAndMessages(null);super.onDestroy(); }
     @Override protected void onSaveInstanceState(Bundle state) {
         super.onSaveInstanceState(state);state.putString("page",page);
@@ -122,9 +132,12 @@ public final class HomeActivity extends Activity {
     private void colors(){
         boolean berry=prefs.getBoolean("berry",false);
         accent=berry?0xfff48ab8:ROSE; surface=berry?0xffffd9e8:0xffffe6ee;
+        taskbar=berry?0xffe99abd:0xfff5a8c9;
     }
         private void showHome() {
-        colors();safe.removeAllViews();page="home";overlay=null;
+        colors();if(media!=null){media.stop();media=null;}safe.removeAllViews();page="home";overlay=null;
+        navFill.setBackgroundColor(taskbar);
+        if(getWindow().getInsetsController()!=null)getWindow().getInsetsController().setSystemBarsAppearance(WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
         desktop=new FrameLayout(this);safe.addView(desktop);
         boolean compact=getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE;
         rail=u.box(true);u.pad(rail,6,8,6,6);
@@ -132,8 +145,8 @@ public final class HomeActivity extends Activity {
         drawRail();
         LinearLayout info=u.box(true);info.setBackground(u.shape(surface,0,BORDER));
         LinearLayout title=u.box(false);title.setBackground(u.titleBar(accent));u.pad(title,7,0,4,0);
-        title.addView(u.glyph(R.drawable.rose_logo,INK),u.lp(16,16));u.gap(title,5);
-        title.addView(u.text("Rosé Desktop",13,INK,"sans-serif-medium"),new LinearLayout.LayoutParams(0,WRAP,1));
+        ImageView titleLogo=new ImageView(this);titleLogo.setImageResource(R.drawable.rose_logo);title.addView(titleLogo,u.lp(22,22));u.gap(title,5);
+        title.addView(u.text("Sakura",13,INK,"sans-serif-medium"),new LinearLayout.LayoutParams(0,WRAP,1));
         title.addView(u.iconButton(R.drawable.ic_ellipsis,"Configurações",INK,surface,14,this::openSettings),u.lp(30,30));
         info.addView(title,u.lp(FULL,32));
         LinearLayout infoBody=u.box(true);u.pad(infoBody,9,7,9,8);
@@ -144,17 +157,24 @@ public final class HomeActivity extends Activity {
             TextClock date=new TextClock(this);date.setFormat12Hour("EEE, dd/MM");date.setFormat24Hour("EEE, dd/MM");
             date.setTextColor(WINE);date.setTextSize(12);infoBody.addView(date);
         }
-        infoBody.addView(u.text("ROSÉ OS  /  0.2",11,WINE,"monospace"));info.addView(infoBody);
-        u.place(desktop,info,compact?162:170,WRAP,Gravity.TOP|Gravity.END,0,12,8,0);
-        LinearLayout dock=u.box(false);u.pad(dock,3,3,3,3);dock.setBackground(u.shape(surface,0,BORDER));
+        infoBody.addView(u.text("SAKURA  /  0.3",11,WINE,"monospace"));
+        homeChoice=u.pill("Fixar como launcher",accent,WINE,this::chooseHome);infoBody.addView(homeChoice,u.lp(FULL,32));updateHomeChoice();
+        info.addView(infoBody);
+        LinearLayout widgets=u.box(true);widgets.addView(info,u.lp(FULL,WRAP));
+        if(prefs.getBoolean("media",true)){
+            u.gap(widgets,8);media=new NowPlaying(this,u,accent,surface);widgets.addView(media.view,u.lp(FULL,WRAP));if(resumed)media.start();
+        }
+        int widgetWidth=Math.max(140,Math.min(184,getResources().getConfiguration().screenWidthDp-110));
+        u.place(desktop,widgets,widgetWidth,WRAP,Gravity.TOP|Gravity.END,0,12,8,0);
+        LinearLayout dock=u.box(false);u.pad(dock,3,3,3,3);dock.setBackground(u.shape(taskbar,0,WINE));
         LinearLayout menu=u.box(false);u.pad(menu,9,0,9,0);menu.setGravity(Gravity.CENTER);
-        u.action(menu,accent,0,()->openApps(false));menu.addView(u.glyph(R.drawable.rose_logo,INK),u.lp(20,20));u.gap(menu,5);
+        u.action(menu,accent,0,()->openApps(false));ImageView menuLogo=new ImageView(this);menuLogo.setImageResource(R.drawable.rose_logo);menu.addView(menuLogo,u.lp(24,24));u.gap(menu,5);
         menu.addView(u.text("Menu",14,INK,"sans-serif-medium"));dock.addView(menu,u.lp(WRAP,46));u.gap(dock,3);
-        dock.addView(u.iconButton(R.drawable.ic_search,"Buscar aplicativos",INK,surface,20,()->openApps(true)),u.lp(42,46));
-        dock.addView(u.iconButton(R.drawable.ic_terminal,"Terminal",INK,surface,20,this::openTerm),u.lp(42,46));
-        dock.addView(u.iconButton(R.drawable.ic_sliders_horizontal,"Ajustes",INK,surface,20,this::openSettings),u.lp(42,46));
+        dock.addView(u.iconButton(R.drawable.ic_search,"Buscar aplicativos",WINE,accent,20,()->openApps(true)),u.lp(42,46));
+        dock.addView(u.iconButton(R.drawable.ic_terminal,"Terminal",WINE,accent,20,this::openTerm),u.lp(42,46));
+        dock.addView(u.iconButton(R.drawable.ic_sliders_horizontal,"Ajustes",WINE,accent,20,this::openSettings),u.lp(42,46));
         u.grow(dock);
-        TextClock clock=new TextClock(this);clock.setFormat24Hour("HH:mm");clock.setFormat12Hour("h:mm");clock.setTextColor(INK);clock.setTextSize(13);clock.setTypeface(Typeface.MONOSPACE);clock.setGravity(Gravity.CENTER);clock.setBackground(u.shape(MILK,0,BORDER));
+        TextClock clock=new TextClock(this);clock.setFormat24Hour("HH:mm");clock.setFormat12Hour("h:mm");clock.setTextColor(INK);clock.setTextSize(13);clock.setTypeface(Typeface.MONOSPACE);clock.setGravity(Gravity.CENTER);clock.setBackground(u.shape(accent,0,BORDER));
         dock.addView(clock,u.lp(58,46));
         u.place(desktop,dock,FULL,WRAP,Gravity.BOTTOM,0,0,0,0);
         desktop.setOnLongClickListener(v->{openSettings();return true;});
@@ -165,13 +185,22 @@ public final class HomeActivity extends Activity {
         TextView name=u.text(label,11,Color.WHITE,"sans-serif-medium");name.setGravity(Gravity.CENTER);name.setMaxLines(2);name.setEllipsize(TextUtils.TruncateAt.END);name.setShadowLayer(u.dp(3),0,u.dp(1),Color.BLACK);name.setBackgroundColor(0x7030202c);u.pad(name,3,1,3,1);item.addView(name,u.lp(FULL,WRAP));
         u.action(item,0,0,action);item.setContentDescription(label);return item;
     }
+    private android.graphics.drawable.Drawable styledIcon(Catalog.Entry item){
+        android.graphics.drawable.Drawable d=catalog.icon(this,item).mutate();
+        if(prefs.getBoolean("pink_icons",true)){
+            // Remap luminance to a rose palette, preserving recognizable icon details.
+            android.graphics.ColorMatrix m=new android.graphics.ColorMatrix(new float[]{.155f,.520f,.053f,0,69,.133f,.447f,.046f,0,34,.136f,.455f,.046f,0,61,0,0,0,1,0});
+            d.setColorFilter(new android.graphics.ColorMatrixColorFilter(m));
+        }else d.clearColorFilter();return d;
+    }
+    private void updateHomeChoice(){if(homeChoice!=null)homeChoice.setVisibility(getSystemService(RoleManager.class).isRoleHeld(RoleManager.ROLE_HOME)?View.GONE:View.VISIBLE);}
     private void drawRail() {
         if(rail==null)return;rail.removeAllViews();
-        rail.addView(shortcut("Aplicativos",getDrawable(R.drawable.ic_folder),()->openApps(false)),u.lp(FULL,72));
-        rail.addView(shortcut("Terminal",getDrawable(R.drawable.ic_terminal),this::openTerm),u.lp(FULL,72));
+        rail.addView(shortcut("Aplicativos",getDrawable(R.drawable.sakura_folder),()->openApps(false)),u.lp(FULL,72));
+        rail.addView(shortcut("Terminal",getDrawable(R.drawable.sakura_terminal),this::openTerm),u.lp(FULL,72));
         int max=getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE?1:4;
         int visible=0;for(String key:pins){Catalog.Entry item=entry(key);if(item==null)continue;
-            View b=shortcut(item.name,catalog.icon(this,item),()->launch(item));b.setOnLongClickListener(v->{pinDialog(item);return true;});rail.addView(b,u.lp(FULL,72));if(++visible>=max)break;
+            View b=shortcut(item.name,styledIcon(item),()->launch(item));b.setOnLongClickListener(v->{pinDialog(item);return true;});rail.addView(b,u.lp(FULL,72));if(++visible>=max)break;
         }
     }
     private Catalog.Entry entry(String key) {for (Catalog.Entry a:apps) if(a.key.equals(key))return a;return null;}
@@ -217,7 +246,7 @@ public final class HomeActivity extends Activity {
         p.setMargins(u.dp(7),u.dp(16),u.dp(7),u.dp(59));overlay.addView(sheet,p);sheet.requestFocus();
         LinearLayout head=u.box(false);u.pad(head,7,0,3,0);head.setBackground(u.titleBar(accent));
         head.addView(u.glyph(icon,WINE),u.lp(22,22));u.gap(head,10);
-        head.addView(u.text(title+" — Rosé",17,INK,"sans-serif-medium"),new LinearLayout.LayoutParams(0,WRAP,1));
+        head.addView(u.text(title+" — Sakura",17,INK,"sans-serif-medium"),new LinearLayout.LayoutParams(0,WRAP,1));
         head.addView(u.iconButton(R.drawable.ic_x,"Fechar",INK,surface,17,this::closeSheet),u.lp(42,42));
         sheet.addView(head,u.lp(FULL,44));u.gap(sheet,5);
     }
@@ -276,7 +305,7 @@ public final class HomeActivity extends Activity {
                 pin.setFocusable(false);row.addView(pin,u.lp(48,48));
             }
             Catalog.Entry e=visible.get(i);
-            ((ImageView)row.getChildAt(0)).setImageDrawable(catalog.icon(HomeActivity.this,e));
+            ((ImageView)row.getChildAt(0)).setImageDrawable(styledIcon(e));
             ((TextView)row.getChildAt(2)).setText(e.name);
             ImageButton pin=(ImageButton)row.getChildAt(3);pin.setImageResource(R.drawable.ic_pin);
             pin.setColorFilter(pins.contains(e.key)?0xffaa245d:0xff876c77);
@@ -304,7 +333,10 @@ public final class HomeActivity extends Activity {
             prefs.edit().putBoolean("clock",!prefs.getBoolean("clock",true)).apply();showHome();openSettings();
         }));
         boolean isDefault=getSystemService(RoleManager.class).isRoleHeld(RoleManager.ROLE_HOME);
-        body.addView(u.commandRow(R.drawable.ic_house,"Tela inicial padrão",isDefault?"Rosé está ativo":"Escolher o Rosé Launcher",this::chooseHome));
+        body.addView(u.commandRow(R.drawable.ic_house,"Tela inicial padrão",isDefault?"Sakura está ativo":"Escolher o Sakura",this::chooseHome));
+        body.addView(u.commandRow(R.drawable.ic_palette,"Ícones rosa",prefs.getBoolean("pink_icons",true)?"Ativos · tocar para usar os originais":"Originais · tocar para usar rosa",()->{prefs.edit().putBoolean("pink_icons",!prefs.getBoolean("pink_icons",true)).apply();showHome();openSettings();}));
+        body.addView(u.commandRow(R.drawable.ic_heart,"Quadro de mídia",prefs.getBoolean("media",true)?"Visível · tocar para ocultar":"Oculto · tocar para mostrar",()->{prefs.edit().putBoolean("media",!prefs.getBoolean("media",true)).apply();showHome();openSettings();}));
+        body.addView(u.commandRow(R.drawable.ic_settings_2,"Acesso às notificações","Permitir leitura de sessões de mídia",()->external(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))));
         body.addView(u.commandRow(R.drawable.ic_terminal,"Conexão com Termux","Configurar comandos na home",this::termHelp));
     }
     private void selectColor(boolean berry){prefs.edit().putBoolean("berry",berry).apply();showHome();openSettings();}
@@ -325,7 +357,7 @@ public final class HomeActivity extends Activity {
     }
     @Override protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);
-        if(request==12&&page.equals("settings"))openSettings();
+        if(request==12){updateHomeChoice();if(page.equals("settings"))openSettings();}
         if(request==14&&result==RESULT_OK&&data!=null&&data.getData()!=null){
             try{external(WallpaperManager.getInstance(this).getCropAndSetWallpaperIntent(data.getData()));}
             catch(RuntimeException e){toast("O sistema não conseguiu abrir o editor de papel de parede.");}
@@ -346,7 +378,7 @@ public final class HomeActivity extends Activity {
             b.setMessage("Instale o Termux pelo F-Droid e abra o app uma vez. Depois, volte aqui para conectar o painel.")
                 .setPositiveButton("Ver Termux",(d,w)->external(new Intent(Intent.ACTION_VIEW,Uri.parse("https://f-droid.org/packages/com.termux/"))));
         }else{
-            b.setMessage("1. No Termux, abra ~/.termux/termux.properties e defina allow-external-apps=true. Rode termux-reload-settings.\n\n2. Autorize o Rosé a executar comandos no Termux. Se o Android já recusou a permissão, ela fica em Apps › Rosé Launcher › Permissões.\n\n3. Teste pwd no painel. Cada envio abre um shell novo na sua pasta inicial.")
+            b.setMessage("1. No Termux, abra ~/.termux/termux.properties e defina allow-external-apps=true. Rode termux-reload-settings.\n\n2. Autorize o Sakura a executar comandos no Termux. Se o Android já recusou a permissão, ela fica em Apps › Sakura › Permissões.\n\n3. Teste pwd no painel. Cada envio abre um shell novo na sua pasta inicial.")
                 .setNeutralButton("Abrir Termux",(d,w)->fullTermux())
                 .setPositiveButton("Permissão",(d,w)->{
                     if(checkSelfPermission(TerminalResult.PERMISSION)==PackageManager.PERMISSION_GRANTED)toast("Permissão concedida.");
@@ -358,7 +390,7 @@ public final class HomeActivity extends Activity {
     @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results){
         super.onRequestPermissionsResult(code,permissions,results);
         if(code==18){if(results.length>0&&results[0]!=PackageManager.PERMISSION_GRANTED)
-            toast("Para autorizar depois, abra as permissões do Rosé em Ajustes.");terminalListener.run();}
+            toast("Para autorizar depois, abra as permissões do Sakura em Ajustes.");terminalListener.run();}
     }
     private void openTerm(){
         panel("term","Terminal",R.drawable.ic_terminal);
