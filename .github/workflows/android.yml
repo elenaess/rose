@@ -1,0 +1,62 @@
+name: APK do Rose Launcher
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Rose-Launcher-v0.2.0-Classic.zip'
+      - 'app/**'
+      - 'gradle/**'
+      - '*.gradle'
+      - 'gradlew'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Importar projeto original
+        id: import
+        shell: bash
+        run: |
+          if [ -f app/build.gradle ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          elif [ -f Rose-Launcher-v0.2.0-Classic.zip ]; then
+            unzip -oq Rose-Launcher-v0.2.0-Classic.zip -x '.github/*'
+            test -f app/build.gradle
+            test -f gradle/wrapper/gradle-wrapper.jar
+            chmod +x gradlew
+            printf '/.gradle/\n**/build/\n/local.properties\n/.idea/\n' > .gitignore
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add app gradle gradlew gradlew.bat settings.gradle build.gradle licencas LEIA-ME.md .gitignore
+            git commit -m "Import Rosé Launcher v0.2.0 Classic Desktop"
+            if ! git push origin HEAD:main; then
+              echo "::warning::Não foi possível salvar o código extraído no repositório. O build continuará com os arquivos extraídos."
+            fi
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Envie Rose-Launcher-v0.2.0-Classic.zip para a raiz do repositório."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-java@v4
+        if: steps.import.outputs.ready == 'true'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        if: steps.import.outputs.ready == 'true'
+      - if: steps.import.outputs.ready == 'true'
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.import.outputs.ready == 'true'
+      - if: steps.import.outputs.ready == 'true'
+        run: bash gradlew --no-daemon :app:assembleDebug
+      - uses: actions/upload-artifact@v4
+        if: steps.import.outputs.ready == 'true'
+        with:
+          name: Rose-Launcher-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
