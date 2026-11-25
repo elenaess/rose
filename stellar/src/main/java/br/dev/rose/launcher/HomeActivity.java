@@ -137,7 +137,6 @@ public final class HomeActivity extends Activity {
         navFill.setBackgroundColor(taskbar);
         if(getWindow().getInsetsController()!=null)getWindow().getInsetsController().setSystemBarsAppearance(0,WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
         desktop=new FrameLayout(this);safe.addView(desktop);
-        if(prefs.getBoolean("starfield",true))desktop.addView(new StarField(this),new FrameLayout.LayoutParams(FULL,FULL));
         boolean compact=getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE;
         int screen=getResources().getConfiguration().screenWidthDp;
         int widgetWidth=Math.max(136,Math.min(184,screen/2-10));
@@ -166,7 +165,7 @@ public final class HomeActivity extends Activity {
             TextClock date=new TextClock(this);date.setFormat12Hour("EEE, dd/MM");date.setFormat24Hour("EEE, dd/MM");
             date.setTextColor(WINE);date.setTextSize(12);infoBody.addView(date);
         }
-        infoBody.addView(u.text("STELLAR  /  1.0",11,WINE,"monospace"));
+        infoBody.addView(u.text("STELLAR  /  1.0.1",11,WINE,"monospace"));
         homeChoice=u.pill("Fixar como launcher",accent,WINE,this::chooseHome);infoBody.addView(homeChoice,u.lp(FULL,32));updateHomeChoice();
         info.addView(infoBody);
         u.place(desktop,info,widgetWidth,WRAP,Gravity.TOP|Gravity.END,0,12,8,0);
@@ -489,8 +488,7 @@ public final class HomeActivity extends Activity {
         TextView deep=u.pill("Órbita",berry?accent:surface,INK,()->selectColor(true));
         light.setSelected(!berry);deep.setSelected(berry);choices.addView(light,u.lp(WRAP,48));u.gap(choices,6);choices.addView(deep,u.lp(WRAP,48));
         palette.addView(choices);body.addView(palette);u.gap(body,8);
-        body.addView(u.commandRow(R.drawable.ic_image,"Céu estelar",prefs.getBoolean("starfield",true)?"Ativo · tocar para usar seu papel de parede":"Desativado · tocar para mostrar estrelas",()->{prefs.edit().putBoolean("starfield",!prefs.getBoolean("starfield",true)).apply();showHome();openSettings();}));
-        body.addView(u.commandRow(R.drawable.ic_image,"Papel de parede","Escolher no Android",()->{prefs.edit().putBoolean("starfield",false).apply();showHome();chooseWallpaper();}));
+        body.addView(u.commandRow(R.drawable.ic_image,"Papel de parede","Escolher no Android",this::chooseWallpaper));
         body.addView(u.commandRow(R.drawable.ic_clock_3,"Relógio na área de trabalho",prefs.getBoolean("clock",true)?"Visível · toque para ocultar":"Oculto · toque para mostrar",()->{
             prefs.edit().putBoolean("clock",!prefs.getBoolean("clock",true)).apply();showHome();openSettings();
         }));
