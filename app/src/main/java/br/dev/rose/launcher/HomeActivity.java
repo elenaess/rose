@@ -172,7 +172,7 @@ public final class HomeActivity extends Activity {
             TextClock date=new TextClock(this);date.setFormat12Hour("EEE, dd/MM");date.setFormat24Hour("EEE, dd/MM");
             date.setTextColor(WINE);date.setTextSize(12);infoBody.addView(date);
         }
-        infoBody.addView(u.text("SAKURA  /  0.4.2",11,WINE,"monospace"));
+        infoBody.addView(u.text("SAKURA  /  0.4.3",11,WINE,"monospace"));
         homeChoice=u.pill("Fixar como launcher",accent,WINE,this::chooseHome);infoBody.addView(homeChoice,u.lp(FULL,32));updateHomeChoice();
         info.addView(infoBody);
         u.place(desktop,info,widgetWidth,WRAP,Gravity.TOP|Gravity.END,0,12,8,0);
@@ -301,8 +301,35 @@ public final class HomeActivity extends Activity {
             }).show();
     }
     private void launch(Catalog.Entry item) {
-        Intent launch=Intent.makeMainActivity(ComponentName.unflattenFromString(item.key));
-        if(external(launch))closeSheet(false);
+        ComponentName component=ComponentName.unflattenFromString(item.key);
+        if(component==null){toast("Atalho inválido. Atualizando aplicativos.");loadApps();return;}
+        String pkg=component.getPackageName();
+        android.content.pm.LauncherApps launcher=getSystemService(android.content.pm.LauncherApps.class);
+        android.os.UserHandle user=android.os.Process.myUserHandle();
+        keyboardOff();
+        // Use the platform launcher API for the exact selected entry, including activity aliases.
+        try{
+            if(launcher!=null&&launcher.isActivityEnabled(component,user)){
+                launcher.startMainActivity(component,user,null,null);closeSheet(false);return;
+            }
+        }catch(RuntimeException e){android.util.Log.w("SakuraLaunch","LauncherApps: "+pkg,e);}
+        try{
+            Intent intent=getPackageManager().getLaunchIntentForPackage(pkg);
+            if(intent!=null){intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(intent);closeSheet(false);return;}
+        }catch(RuntimeException e){android.util.Log.w("SakuraLaunch","Package launch: "+pkg,e);}
+        try{
+            Intent intent=new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+                .setComponent(component).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);closeSheet(false);return;
+        }catch(RuntimeException e){android.util.Log.w("SakuraLaunch","Explicit launch: "+pkg,e);}
+        if(launcher!=null)try{
+            for(android.content.pm.LauncherActivityInfo info:launcher.getActivityList(pkg,user)){
+                try{launcher.startMainActivity(info.getComponentName(),user,null,null);closeSheet(false);return;}
+                catch(RuntimeException ignored){}
+            }
+        }catch(RuntimeException ignored){}
+        toast("Não foi possível abrir "+item.name+". Confira se está instalado e ativado.");
+        loadApps();
     }
     private boolean external(Intent intent) {
         try {startActivity(intent);return true;}
@@ -400,11 +427,13 @@ public final class HomeActivity extends Activity {
                 row.addView(label,new LinearLayout.LayoutParams(0,WRAP,1));
                 ImageButton pin=new ImageButton(HomeActivity.this);u.pad(pin,12,12,12,12);
                 pin.setScaleType(ImageView.ScaleType.CENTER_INSIDE);pin.setBackgroundColor(Color.TRANSPARENT);
-                pin.setFocusable(false);row.addView(pin,u.lp(48,48));
+                pin.setFocusable(false);pin.setFocusableInTouchMode(false);row.setDescendantFocusability(android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS);row.addView(pin,u.lp(48,48));
             }
             Catalog.Entry e=visible.get(i);
             ((ImageView)row.getChildAt(0)).setImageDrawable(styledIcon(e));
             ((TextView)row.getChildAt(2)).setText(e.name);
+            row.setOnClickListener(v->launch(e));
+            row.setOnLongClickListener(v->{pinDialog(e);return true;});
             ImageButton pin=(ImageButton)row.getChildAt(3);pin.setImageResource(R.drawable.ic_pin);
             pin.setColorFilter(pins.contains(e.key)?0xffaa245d:0xff876c77);
             pin.setContentDescription("Opções de "+e.name);pin.setOnClickListener(v->pinDialog(e));
