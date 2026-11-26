@@ -67,9 +67,9 @@ final class ControlCenter {
         buttons.addView(u.pill("Brilho do sistema",surface,WINE,()->open(Settings.ACTION_DISPLAY_SETTINGS,Settings.ACTION_SETTINGS)),new LinearLayout.LayoutParams(0,u.dp(40),1));
         sliders.addView(buttons);body.addView(sliders);u.gap(body,8);
         heading(body,"ATALHOS DO SISTEMA");
-        tiles(body,new int[]{R.drawable.ic_sakura_plane,R.drawable.ic_sakura_bell},new String[]{"Modo avião","Não perturbe"},new String[]{Settings.ACTION_AIRPLANE_MODE_SETTINGS,Settings.ACTION_ZEN_MODE_SETTINGS});
+        tiles(body,new int[]{R.drawable.ic_sakura_plane,R.drawable.ic_sakura_bell},new String[]{"Modo avião","Não perturbe"},new String[]{Settings.ACTION_AIRPLANE_MODE_SETTINGS,"android.settings.ZEN_MODE_SETTINGS"});
         tiles(body,new int[]{R.drawable.ic_battery,R.drawable.ic_settings_2},new String[]{"Bateria","Ajustes Android"},new String[]{Settings.ACTION_BATTERY_SAVER_SETTINGS,Settings.ACTION_SETTINGS});
-        tiles(body,new int[]{R.drawable.ic_sakura_data,R.drawable.ic_sakura_wifi},new String[]{"Uso de dados","Roteador"},new String[]{Settings.ACTION_DATA_USAGE_SETTINGS,Settings.ACTION_TETHER_SETTINGS});
+        tiles(body,new int[]{R.drawable.ic_sakura_data,R.drawable.ic_sakura_wifi},new String[]{"Uso de dados","Roteador"},new String[]{Settings.ACTION_DATA_USAGE_SETTINGS,"android.settings.TETHER_SETTINGS"});
     }
     void style(SeekBar b){b.setProgressTintList(ColorStateList.valueOf(WINE));b.setThumbTintList(ColorStateList.valueOf(WINE));b.setProgressBackgroundTintList(ColorStateList.valueOf(accent));}
     void tiles(LinearLayout body,int[] icons,String[] labels,String[] actions){
@@ -86,7 +86,7 @@ final class ControlCenter {
         body.addView(card);u.gap(body,8);
         body.addView(u.commandRow(R.drawable.ic_sakura_bell,"Configurações de notificações","Gerenciar alertas dos aplicativos",()->open(Settings.ACTION_ALL_APPS_NOTIFICATION_SETTINGS,Settings.ACTION_SETTINGS)));
         body.addView(u.commandRow(R.drawable.ic_clock_3,"Histórico de notificações","Abrir histórico, quando disponível",()->open("android.settings.NOTIFICATION_HISTORY",Settings.ACTION_ALL_APPS_NOTIFICATION_SETTINGS)));
-        body.addView(u.commandRow(R.drawable.ic_sakura_bell,"Não perturbe","Configurar interrupções",()->open(Settings.ACTION_ZEN_MODE_SETTINGS,Settings.ACTION_SETTINGS)));
+        body.addView(u.commandRow(R.drawable.ic_sakura_bell,"Não perturbe","Configurar interrupções",()->open("android.settings.ZEN_MODE_SETTINGS",Settings.ACTION_SETTINGS)));
     }
     String batteryText(){
         try{Intent i=host.registerReceiver(null,new IntentFilter(Intent.ACTION_BATTERY_CHANGED));if(i!=null){int n=i.getIntExtra(BatteryManager.EXTRA_LEVEL,-1),max=i.getIntExtra(BatteryManager.EXTRA_SCALE,100);if(n>=0&&max>0)return Math.round(n*100f/max)+"%";}}catch(RuntimeException ignored){}
