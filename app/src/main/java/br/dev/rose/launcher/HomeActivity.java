@@ -39,7 +39,7 @@ public final class HomeActivity extends Activity {
     private AlphabetIndex alphabet;
     private static final long MOTION=90L;
     private float shadeX,shadeY;
-    private boolean shadeCandidate,shadeConsumed;
+    private boolean shadeCandidate,shadeConsumed,shadeClosing;
     private SharedPreferences prefs;
     private final Catalog catalog = new Catalog();
     private volatile IconPack iconPack=IconPack.empty();
@@ -86,6 +86,7 @@ public final class HomeActivity extends Activity {
         navFill.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         base.setOnApplyWindowInsetsListener((v, in) -> {
             Insets bounds = in.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime());
+            // Keep the camera cutout and navigation area safe, even when the status bar is hidden.
             safe.setPadding(bounds.left,bounds.top,bounds.right,bounds.bottom);
             FrameLayout.LayoutParams bar=(FrameLayout.LayoutParams)navFill.getLayoutParams();
             int bottom=in.getInsets(WindowInsets.Type.navigationBars()).bottom;
@@ -106,9 +107,11 @@ public final class HomeActivity extends Activity {
             if ("apps".equals(prev)) openApps(false);
             else if ("term".equals(prev)) openTerm();
             else if ("settings".equals(prev)) openSettings();
+            else if ("quick".equals(prev)) openCenter(true);
+            else if ("notices".equals(prev)) openCenter(false);
         }
     }
-    @Override protected void onResume() { super.onResume(); resumed=true; TerminalResult.onChange = terminalListener; terminalListener.run(); updateHomeChoice(); if(media!=null)media.start(); }
+    @Override protected void onResume() { super.onResume(); resumed=true; applyStatusBar(); TerminalResult.onChange = terminalListener; terminalListener.run(); updateHomeChoice(); if(media!=null)media.start(); }
     @Override protected void onPause() { resumed=false;if(media!=null)media.stop(); if (TerminalResult.onChange == terminalListener) TerminalResult.onChange = null; super.onPause(); }
     @Override protected void onDestroy() { if(media!=null)media.stop();widgetHost.stopListening();unregisterReceiver(packages);worker.shutdownNow();main.removeCallbacksAndMessages(null);super.onDestroy(); }
     @Override protected void onSaveInstanceState(Bundle state) {
@@ -116,24 +119,44 @@ public final class HomeActivity extends Activity {
         state.putString("draft","term".equals(page) && input != null ? input.getText().toString() : draft);
     }
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent);setIntent(intent);closeSheet(); }
+    private boolean centerPage(){return "quick".equals(page)||"notices".equals(page);}
+    private void applyStatusBar(){
+        if(prefs==null)return;
+        WindowInsetsController controller=getWindow().getInsetsController();
+        if(controller==null)return;
+        boolean hide=centerPage()||("home".equals(page)&&prefs.getBoolean("control_center",true));
+        controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        if(hide)controller.hide(WindowInsets.Type.statusBars());
+        else controller.show(WindowInsets.Type.statusBars());
+    }
+    @Override public void onWindowFocusChanged(boolean focused){
+        super.onWindowFocusChanged(focused);
+        if(focused)applyStatusBar();
+    }
     @Override public boolean dispatchTouchEvent(MotionEvent event){
         int action=event.getActionMasked();
         if(action==MotionEvent.ACTION_DOWN){
-            shadeConsumed=false;shadeCandidate=false;
+            shadeConsumed=false;shadeCandidate=false;shadeClosing=false;
             if("home".equals(page)&&desktop!=null&&prefs.getBoolean("control_center",true)){
                 int[] origin=new int[2];desktop.getLocationOnScreen(origin);
                 shadeX=event.getRawX()-origin[0];shadeY=event.getRawY()-origin[1];
-                shadeCandidate=shadeY>=0&&shadeY<=u.dp(48)&&shadeX>=0&&shadeX<=desktop.getWidth();
+                shadeCandidate=shadeY>=0&&shadeY<=u.dp(72)&&shadeX>=0&&shadeX<=desktop.getWidth();
+            }else if(centerPage()&&sheet!=null){
+                int[] origin=new int[2];desktop.getLocationOnScreen(origin);
+                shadeX=event.getRawX()-origin[0];shadeY=event.getRawY()-origin[1];
+                shadeClosing=shadeY>=0&&shadeY<=u.dp(56);
+                shadeCandidate=shadeClosing;
             }
         }else if(action==MotionEvent.ACTION_MOVE&&shadeCandidate&&!shadeConsumed){
             int[] origin=new int[2];desktop.getLocationOnScreen(origin);
             float dx=event.getRawX()-origin[0]-shadeX,dy=event.getRawY()-origin[1]-shadeY;
-            if(Math.abs(dx)>u.dp(32)&&Math.abs(dx)>dy)shadeCandidate=false;
-            else if(dy>u.dp(38)&&dy>Math.abs(dx)*1.4f){
+            float vertical=shadeClosing?-dy:dy;
+            if(Math.abs(dx)>u.dp(32)&&Math.abs(dx)>Math.abs(dy))shadeCandidate=false;
+            else if(vertical>u.dp(30)&&vertical>Math.abs(dx)*1.4f){
                 MotionEvent cancel=MotionEvent.obtain(event);cancel.setAction(MotionEvent.ACTION_CANCEL);
                 super.dispatchTouchEvent(cancel);cancel.recycle();
                 shadeCandidate=false;shadeConsumed=true;
-                openCenter(shadeX>=desktop.getWidth()/2f);return true;
+                if(shadeClosing)closeSheet();else openCenter(shadeX>=desktop.getWidth()/2f);return true;
             }
         }
         if(shadeConsumed){if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL)shadeConsumed=false;return true;}
@@ -166,7 +189,7 @@ public final class HomeActivity extends Activity {
         taskbar=berry?0xffe99abd:0xfff5a8c9;
     }
         private void showHome() {
-        colors();if(media!=null){media.stop();media=null;}safe.removeAllViews();page="home";overlay=null;
+        colors();if(media!=null){media.stop();media=null;}safe.removeAllViews();page="home";overlay=null;applyStatusBar();
         navFill.setBackgroundColor(taskbar);
         if(getWindow().getInsetsController()!=null)getWindow().getInsetsController().setSystemBarsAppearance(WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
         desktop=new FrameLayout(this);safe.addView(desktop);
@@ -198,7 +221,7 @@ public final class HomeActivity extends Activity {
             TextClock date=new TextClock(this);date.setFormat12Hour("EEE, dd/MM");date.setFormat24Hour("EEE, dd/MM");
             date.setTextColor(WINE);date.setTextSize(12);infoBody.addView(date);
         }
-        infoBody.addView(u.text("SAKURA  /  0.5.1",11,WINE,"monospace"));
+        infoBody.addView(u.text("SAKURA  /  0.5.2",11,WINE,"monospace"));
         homeChoice=u.pill("Fixar como launcher",accent,WINE,this::chooseHome);infoBody.addView(homeChoice,u.lp(FULL,32));updateHomeChoice();
         info.addView(infoBody);
         u.place(desktop,info,widgetWidth,WRAP,Gravity.TOP|Gravity.END,0,12,8,0);
@@ -369,20 +392,21 @@ public final class HomeActivity extends Activity {
     private void closeSheet(boolean animate){
         if(page.equals("term")&&input!=null)draft=input.getText().toString();
         FrameLayout old=overlay;LinearLayout oldSheet=sheet;
-        overlay=null;page="home";keyboardOff();
+        boolean wasCenter=centerPage();
+        overlay=null;page="home";keyboardOff();applyStatusBar();
         if(old!=null){
             if(oldSheet!=null)oldSheet.animate().cancel();
             if(animate&&oldSheet!=null&&android.animation.ValueAnimator.areAnimatorsEnabled()){
                 old.setOnClickListener(null);
                 oldSheet.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
-                oldSheet.animate().alpha(0f).translationY(u.dp(10)).setDuration(MOTION)
+                oldSheet.animate().alpha(0f).translationY(u.dp(wasCenter?-18:10)).setDuration(MOTION)
                     .setInterpolator(new android.view.animation.AccelerateInterpolator()).withEndAction(()->safe.removeView(old)).start();
             }else safe.removeView(old);
         }
         desktop.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
     }
     private void panel(String id,String title,int icon) {
-        closeSheet(false);page=id;
+        closeSheet(false);page=id;applyStatusBar();
         desktop.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
         overlay=new FrameLayout(this);safe.addView(overlay);
         overlay.setBackgroundColor(Color.TRANSPARENT);overlay.setOnClickListener(v->closeSheet());
@@ -515,6 +539,10 @@ public final class HomeActivity extends Activity {
     }
     private void openCenter(boolean quick){
         panel(quick?"quick":"notices",quick?"Controles rápidos":"Notificações",quick?R.drawable.ic_sliders_horizontal:R.drawable.ic_sakura_bell);
+        // A center occupies the entire app surface, not a floating desktop window.
+        FrameLayout.LayoutParams full=new FrameLayout.LayoutParams(FULL,FULL,Gravity.TOP);
+        sheet.setLayoutParams(full);sheet.setPadding(0,0,0,0);sheet.setBackgroundColor(surface);
+        overlay.setBackgroundColor(surface);overlay.setOnClickListener(null);
         // Drop from the top, with the same 90 ms animation budget as other windows.
         sheet.animate().cancel();
         if(android.animation.ValueAnimator.areAnimatorsEnabled()){
@@ -538,7 +566,7 @@ public final class HomeActivity extends Activity {
         body.addView(u.commandRow(R.drawable.ic_image,"Papel de parede","Escolher no Android",this::chooseWallpaper));
         body.addView(u.commandRow(R.drawable.ic_sliders_horizontal,"Central Sakura","Abrir controles rápidos",()->openCenter(true)));
         body.addView(u.commandRow(R.drawable.ic_sakura_bell,"Central de notificações","Abrir atalhos de notificações",()->openCenter(false)));
-        body.addView(u.commandRow(R.drawable.ic_panel_left,"Gestos no topo",prefs.getBoolean("control_center",true)?"Ativos · esquerda e direita":"Desativados · toque para ativar",()->{prefs.edit().putBoolean("control_center",!prefs.getBoolean("control_center",true)).apply();openSettings();}));
+        body.addView(u.commandRow(R.drawable.ic_panel_left,"Gestos no topo",prefs.getBoolean("control_center",true)?"Ativos · barra do sistema oculta na home":"Desativados · barra original visível",()->{prefs.edit().putBoolean("control_center",!prefs.getBoolean("control_center",true)).apply();openSettings();}));
         body.addView(u.commandRow(R.drawable.ic_clock_3,"Relógio na área de trabalho",prefs.getBoolean("clock",true)?"Visível · toque para ocultar":"Oculto · toque para mostrar",()->{
             prefs.edit().putBoolean("clock",!prefs.getBoolean("clock",true)).apply();showHome();openSettings();
         }));

@@ -82,7 +82,7 @@ final class ControlCenter {
         LinearLayout card=u.box(true);u.pad(card,12,13,12,13);card.setBackground(u.shape(MILK,0,BORDER));
         card.addView(u.glyph(R.drawable.ic_sakura_bell,WINE),u.lp(26,26));u.gap(card,8);
         card.addView(u.text("Notificações do sistema",17,INK,"sans-serif-medium"));u.gap(card,7);
-        card.addView(u.text("Para ler mensagens e alertas reais, deslize a barra de status original do Android. O Sakura não lê o conteúdo das suas notificações.",14,MUTE,"sans-serif"));
+        card.addView(u.text("Para ler mensagens e alertas reais, deslize a partir da borda superior da tela para revelar a barra original do Android e abra as notificações. O Sakura não lê o conteúdo das suas notificações.",14,MUTE,"sans-serif"));
         body.addView(card);u.gap(body,8);
         body.addView(u.commandRow(R.drawable.ic_sakura_bell,"Configurações de notificações","Gerenciar alertas dos aplicativos",()->open(Settings.ACTION_ALL_APPS_NOTIFICATION_SETTINGS,Settings.ACTION_SETTINGS)));
         body.addView(u.commandRow(R.drawable.ic_clock_3,"Histórico de notificações","Abrir histórico, quando disponível",()->open("android.settings.NOTIFICATION_HISTORY",Settings.ACTION_ALL_APPS_NOTIFICATION_SETTINGS)));
