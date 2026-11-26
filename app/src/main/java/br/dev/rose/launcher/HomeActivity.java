@@ -38,6 +38,8 @@ public final class HomeActivity extends Activity {
     private static final int CELL_H=80,CELL_W=84;
     private AlphabetIndex alphabet;
     private static final long MOTION=90L;
+    private float shadeX,shadeY;
+    private boolean shadeCandidate,shadeConsumed;
     private SharedPreferences prefs;
     private final Catalog catalog = new Catalog();
     private volatile IconPack iconPack=IconPack.empty();
@@ -114,6 +116,30 @@ public final class HomeActivity extends Activity {
         state.putString("draft","term".equals(page) && input != null ? input.getText().toString() : draft);
     }
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent);setIntent(intent);closeSheet(); }
+    @Override public boolean dispatchTouchEvent(MotionEvent event){
+        int action=event.getActionMasked();
+        if(action==MotionEvent.ACTION_DOWN){
+            shadeConsumed=false;shadeCandidate=false;
+            if("home".equals(page)&&desktop!=null&&prefs.getBoolean("control_center",true)){
+                int[] origin=new int[2];desktop.getLocationOnScreen(origin);
+                shadeX=event.getRawX()-origin[0];shadeY=event.getRawY()-origin[1];
+                shadeCandidate=shadeY>=0&&shadeY<=u.dp(48)&&shadeX>=0&&shadeX<=desktop.getWidth();
+            }
+        }else if(action==MotionEvent.ACTION_MOVE&&shadeCandidate&&!shadeConsumed){
+            int[] origin=new int[2];desktop.getLocationOnScreen(origin);
+            float dx=event.getRawX()-origin[0]-shadeX,dy=event.getRawY()-origin[1]-shadeY;
+            if(Math.abs(dx)>u.dp(32)&&Math.abs(dx)>dy)shadeCandidate=false;
+            else if(dy>u.dp(38)&&dy>Math.abs(dx)*1.4f){
+                MotionEvent cancel=MotionEvent.obtain(event);cancel.setAction(MotionEvent.ACTION_CANCEL);
+                super.dispatchTouchEvent(cancel);cancel.recycle();
+                shadeCandidate=false;shadeConsumed=true;
+                openCenter(shadeX>=desktop.getWidth()/2f);return true;
+            }
+        }
+        if(shadeConsumed){if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL)shadeConsumed=false;return true;}
+        if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL||action==MotionEvent.ACTION_POINTER_DOWN)shadeCandidate=false;
+        return super.dispatchTouchEvent(event);
+    }
     @Override public void onBackPressed() {
         if (!page.equals("home")) closeSheet();
         else if (!getSystemService(RoleManager.class).isRoleHeld(RoleManager.ROLE_HOME)) super.onBackPressed();
@@ -172,7 +198,7 @@ public final class HomeActivity extends Activity {
             TextClock date=new TextClock(this);date.setFormat12Hour("EEE, dd/MM");date.setFormat24Hour("EEE, dd/MM");
             date.setTextColor(WINE);date.setTextSize(12);infoBody.addView(date);
         }
-        infoBody.addView(u.text("SAKURA  /  0.4.3",11,WINE,"monospace"));
+        infoBody.addView(u.text("SAKURA  /  0.5.0",11,WINE,"monospace"));
         homeChoice=u.pill("Fixar como launcher",accent,WINE,this::chooseHome);infoBody.addView(homeChoice,u.lp(FULL,32));updateHomeChoice();
         info.addView(infoBody);
         u.place(desktop,info,widgetWidth,WRAP,Gravity.TOP|Gravity.END,0,12,8,0);
@@ -487,6 +513,17 @@ public final class HomeActivity extends Activity {
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(false);sheet.addView(scroll,u.flex(true));
         LinearLayout body=u.box(true);scroll.addView(body);return body;
     }
+    private void openCenter(boolean quick){
+        panel(quick?"quick":"notices",quick?"Controles rápidos":"Notificações",quick?R.drawable.ic_sliders_horizontal:R.drawable.ic_sakura_bell);
+        // Drop from the top, with the same 90 ms animation budget as other windows.
+        sheet.animate().cancel();
+        if(android.animation.ValueAnimator.areAnimatorsEnabled()){
+            sheet.setAlpha(.7f);sheet.setTranslationY(-u.dp(12));
+            sheet.animate().alpha(1f).translationY(0f).setDuration(MOTION).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+        }else{sheet.setAlpha(1f);sheet.setTranslationY(0);}
+        LinearLayout body=scrollingContent();u.pad(body,8,5,8,8);
+        new ControlCenter(this,u,accent,surface).populate(body,quick);
+    }
     private void openSettings(){
         panel("settings","Aparência",R.drawable.ic_sliders_horizontal);
         LinearLayout body=scrollingContent();u.gap(body,7);
@@ -499,6 +536,9 @@ public final class HomeActivity extends Activity {
         light.setSelected(!berry);deep.setSelected(berry);choices.addView(light,u.lp(WRAP,48));u.gap(choices,6);choices.addView(deep,u.lp(WRAP,48));
         palette.addView(choices);body.addView(palette);u.gap(body,8);
         body.addView(u.commandRow(R.drawable.ic_image,"Papel de parede","Escolher no Android",this::chooseWallpaper));
+        body.addView(u.commandRow(R.drawable.ic_sliders_horizontal,"Central Sakura","Abrir controles rápidos",()->openCenter(true)));
+        body.addView(u.commandRow(R.drawable.ic_sakura_bell,"Central de notificações","Abrir atalhos de notificações",()->openCenter(false)));
+        body.addView(u.commandRow(R.drawable.ic_panel_left,"Gestos no topo",prefs.getBoolean("control_center",true)?"Ativos · esquerda e direita":"Desativados · toque para ativar",()->{prefs.edit().putBoolean("control_center",!prefs.getBoolean("control_center",true)).apply();openSettings();}));
         body.addView(u.commandRow(R.drawable.ic_clock_3,"Relógio na área de trabalho",prefs.getBoolean("clock",true)?"Visível · toque para ocultar":"Oculto · toque para mostrar",()->{
             prefs.edit().putBoolean("clock",!prefs.getBoolean("clock",true)).apply();showHome();openSettings();
         }));
